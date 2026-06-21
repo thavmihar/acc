@@ -1,172 +1,110 @@
 // app/(public)/login/page.tsx
+// SERVER COMPONENT — renders instantly, no hydration wait
+// Static shell: logo, title, layout chrome
+// Only the sign-in button is client-rendered via Suspense
 
-'use client'
+import { Suspense }        from 'react'
+import GoogleSignInButton  from './GoogleSignInButton'
 
-import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { signInWithGoogle, createSession } from '@/lib/firebase/client'
-
-export default function LoginPage() {
+// Fallback shown while GoogleSignInButton hydrates
+function ButtonSkeleton() {
   return (
-    <Suspense fallback={<LoginLoading />}>
-      <LoginContent />
-    </Suspense>
-  )
-}
-
-function LoginLoading() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-sm text-gray-500">Loading...</p>
+    <div
+      style={{
+        width: '100%', height: 48,
+        borderRadius: 12,
+        background: 'rgba(255,255,255,0.8)',
+        border: '1px solid #E2E8F0',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 12, cursor: 'not-allowed',
+      }}
+    >
+      <div style={{
+        width: 20, height: 20, borderRadius: '50%',
+        background: '#F1F5F9', flexShrink: 0,
+      }} />
+      <div style={{
+        width: 140, height: 14, borderRadius: 6,
+        background: '#F1F5F9',
+      }} />
     </div>
   )
 }
 
-function LoginContent() {
-  const router = useRouter()
-  const params = useSearchParams()
-
-  const redirect = params.get('redirect') ?? '/dashboard'
-  const errorParam = params.get('error')
-
-  const [loading, setLoading] = useState(false)
-
-  const [error, setError] = useState(
-    errorParam === 'access_denied'
-      ? 'You do not have permission to access that page.'
-      : errorParam === 'wrong_alliance'
-      ? 'You cannot access another alliance.'
-      : errorParam === 'disabled'
-      ? 'Your account has been disabled. Contact your Supreme.'
-      : ''
-  )
-
-  const handleSignIn = async () => {
-    setLoading(true)
-    setError('')
-
-    try {
-      const user = await signInWithGoogle()
-
-      const result = await createSession(user)
-
-      if (!result.success) {
-        setError(result.error ?? 'Sign-in failed. Please try again.')
-        return
-      }
-
-      if (result.needs_verify) {
-        router.push('/register')
-      } else {
-        router.push(redirect)
-      }
-    } catch (err: any) {
-      if (err?.code === 'auth/popup-closed-by-user') {
-        // User closed popup
-      } else if (
-        err?.code ===
-        'auth/account-exists-with-different-credential'
-      ) {
-        setError(
-          'This Google account is already linked to a different commander.'
-        )
-      } else if (err?.code === 'auth/popup-blocked') {
-        setError(
-          'Popup was blocked. Please allow popups for this site and try again.'
-        )
-      } else {
-        setError('Sign-in failed. Please try again.')
-        console.error('[LOGIN]', err)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
+export default function LoginPage() {
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
       style={{
-        background:
-          'linear-gradient(135deg, #F8FAFC 0%, #EEF2F7 100%)',
+        minHeight: '100vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+        background: 'linear-gradient(135deg, #F8FAFC 0%, #EEF2F7 100%)',
       }}
     >
       {/* Tactical grid background */}
       <div
-        className="fixed inset-0 pointer-events-none opacity-[0.025]"
         style={{
+          position: 'fixed', inset: 0, pointerEvents: 'none', opacity: 0.025,
           backgroundImage:
             'linear-gradient(#22C55E 1px, transparent 1px), linear-gradient(90deg, #22C55E 1px, transparent 1px)',
           backgroundSize: '48px 48px',
         }}
       />
 
-      <div className="relative w-full max-w-sm flex flex-col gap-6 animate-fade-in">
+      <div
+        style={{
+          position: 'relative', width: '100%', maxWidth: 384,
+          display: 'flex', flexDirection: 'column', gap: 24,
+        }}
+        className="animate-fade-in"
+      >
+        {/* ── STATIC SHELL — server rendered instantly ── */}
+
         {/* Brand header */}
-        <div className="text-center">
+        <div style={{ textAlign: 'center' }}>
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent mb-4"
             style={{
-              boxShadow:
-                '0 0 0 1px rgba(34,197,94,0.2), 0 8px 32px rgba(34,197,94,0.15)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 64, height: 64, borderRadius: 16,
+              background: '#22C55E', marginBottom: 16,
+              boxShadow: '0 0 0 1px rgba(34,197,94,0.2), 0 8px 32px rgba(34,197,94,0.15)',
             }}
           >
-            <span className="text-white text-2xl font-bold">◈</span>
+            <span style={{ color: 'white', fontSize: 24, fontWeight: 700 }}>◈</span>
           </div>
-
-          <h1 className="text-2xl font-semibold text-tactical-900">
+          <h1 style={{ fontSize: 24, fontWeight: 600, color: '#0F172A', margin: 0 }}>
             Command Center
           </h1>
-
-          <p className="text-sm text-tactical-500 mt-1">
+          <p style={{ fontSize: 14, color: '#64748B', marginTop: 4, marginBottom: 2 }}>
             1307 Alliance Command Center #7C
           </p>
-
-          <p className="text-xs text-tactical-400 mt-0.5 font-mono">
+          <p style={{ fontSize: 12, color: '#94A3B8', fontFamily: 'monospace' }}>
             Last War: Survival
           </p>
         </div>
 
         {/* Login card */}
-        <div className="glass-card-raised p-8 flex flex-col gap-5">
+        <div className="glass-card-raised" style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
-            <p className="font-semibold text-tactical-900">
+            <p style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', margin: 0 }}>
               Welcome back, Commander
             </p>
-
-            <p className="text-sm text-tactical-500 mt-1">
+            <p style={{ fontSize: 14, color: '#64748B', marginTop: 6 }}>
               Sign in with your linked Google account to access the platform.
             </p>
           </div>
 
-          {error && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 animate-fade-in">
-              <p className="text-xs text-red-700">{error}</p>
-            </div>
-          )}
+          {/* ── CLIENT COMPONENT — hydrates after shell renders ── */}
+          <Suspense fallback={<ButtonSkeleton />}>
+            <GoogleSignInButton />
+          </Suspense>
 
-          <button
-            onClick={handleSignIn}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-5 py-3 rounded-xl
-                       bg-white border border-tactical-200 text-tactical-800 font-medium text-sm
-                       hover:bg-gray-50 hover:border-tactical-300 hover:shadow-md
-                       active:scale-[0.98] transition-all duration-150
-                       disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-          >
-            {loading ? (
-              'Signing in...'
-            ) : (
-              'Continue with Google'
-            )}
-          </button>
-
-          <div className="text-center">
-            <p className="text-xs text-tactical-400">
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: 12, color: '#94A3B8' }}>
               Not registered?{' '}
               <a
                 href="/register"
-                className="text-accent-mid font-medium hover:underline"
+                style={{ color: '#16A34A', fontWeight: 500, textDecoration: 'none' }}
               >
                 Verify your commander
               </a>
@@ -174,10 +112,10 @@ function LoginContent() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-tactical-400">
+        {/* Footer */}
+        <p style={{ textAlign: 'center', fontSize: 12, color: '#94A3B8' }}>
           Access restricted to verified commanders only.
-          <br />
-          Contact your Supreme for registration assistance.
+          <br />Contact your Supreme for registration assistance.
         </p>
       </div>
     </div>
