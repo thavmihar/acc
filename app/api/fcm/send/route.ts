@@ -113,9 +113,11 @@ export async function POST(req: NextRequest) {
       .filter(Boolean) as string[]
 
     if (stale.length) {
-      await supabaseAdmin
-        .rpc('prune_fcm_tokens', { p_tokens: stale })
-        .catch(console.error)
+      try {
+        await supabaseAdmin.rpc('prune_fcm_tokens', { p_tokens: stale })
+      } catch (err) {
+        console.error('[FCM] Token pruning failed:', err)
+      }
     }
   }
 

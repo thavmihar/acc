@@ -1,10 +1,11 @@
 // app/api/fcm/register/route.ts
 // ACC #7C — Save / remove FCM token for the logged-in commander
+// Auth: reads __acc_session cookie (matches your existing auth pattern)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
-import { verifyIdToken } from '@/lib/firebase/admin'
+import { verifySessionCookie, SESSION_COOKIE_NAME } from '@/lib/firebase/admin'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,12 +16,12 @@ const TokenSchema = z.object({
   token: z.string().min(10).max(512),
 })
 
-// ── Resolve commander from Bearer token in Authorization header ───────────────
+// ── Resolve commander from session cookie ─────────────────────────────────────
 async function getCommander(req: NextRequest) {
-  const idToken = req.headers.get('Authorization')?.replace('Bearer ', '').trim()
-  if (!idToken) return null
+  const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)?.value
+  if (!sessionCookie) return null
 
-  const decoded = await verifyIdToken(idToken)
+  const decoded = await verifySessionCookie(sessionCookie)
   if (!decoded) return null
 
   const { data, error } = await supabaseAdmin
