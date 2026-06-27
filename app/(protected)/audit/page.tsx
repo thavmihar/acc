@@ -38,6 +38,59 @@ const ACTION_COLORS: Record<string, string> = {
   alliance_created:       'text-blue-600',
 }
 
+/** Convert raw metadata into a short human-readable summary */
+function formatMetadata(action: string, metadata: Record<string, any>): string | null {
+  if (!metadata || Object.keys(metadata).length === 0) return null
+
+  switch (action) {
+    case 'canyon_team_updated':
+    case 'dsb_team_updated': {
+      const act  = metadata.action === 'added' ? 'Added' : metadata.action === 'finalized' ? 'Finalized' : 'Updated'
+      const tf   = metadata.task_force ? `TF-${metadata.task_force}` : ''
+      const role = metadata.roster_role ? ` as ${metadata.roster_role}` : ''
+      const slot = metadata.slot ? ` · Slot ${metadata.slot}` : ''
+      return `${act} ${tf}${role}${slot}`.trim() || null
+    }
+    case 'canyon_attendance_recorded':
+    case 'dsb_attendance_recorded': {
+      const tf     = metadata.task_force ? `TF-${metadata.task_force}` : ''
+      const status = metadata.status ?? ''
+      return `${tf} · ${status}`.trim() || null
+    }
+    case 'duel_day_locked': {
+      const day = metadata.day ? String(metadata.day) : ''
+      return day ? `Day: ${day.charAt(0).toUpperCase() + day.slice(1)}` : null
+    }
+    case 'role_changed': {
+      const from = metadata.from_role ?? ''
+      const to   = metadata.role ?? metadata.to_role ?? ''
+      if (from && to) return `${from.toUpperCase()} → ${to.toUpperCase()}`
+      if (to) return `New role: ${to.toUpperCase()}`
+      return null
+    }
+    case 'transfer_approved':
+    case 'transfer_rejected':
+    case 'transfer_requested': {
+      return null // transfer info already visible from target fields
+    }
+    case 'commander_created': {
+      const role    = metadata.role ? metadata.role.toUpperCase() : ''
+      return role ? `Role: ${role}` : null
+    }
+    case 'alliance_created': {
+      return metadata.tag ? `[${metadata.tag}] ${metadata.name ?? ''}`.trim() : null
+    }
+    case 'inactive_flagged': {
+      return null // target field already shows who was flagged
+    }
+    case 'minimum_score_set': {
+      return metadata.minimum_score != null ? `Score: ${metadata.minimum_score}` : null
+    }
+    default:
+      return null
+  }
+}
+
 export default async function AuditPage({
   searchParams,
 }: {
@@ -58,7 +111,6 @@ export default async function AuditPage({
 
   const supabase = createAdminClient()
 
-  // Supreme sees all logs, others see their alliance only
   let query = supabase
     .from('audit_logs')
     .select('*', { count: 'exact' })
@@ -85,7 +137,7 @@ export default async function AuditPage({
         </p>
       </div>
 
-      {/* Filter by action */}
+      {/* Filter chips */}
       <div className="flex gap-2 flex-wrap">
         <a href="/audit"
            className={`chip ${!actionFilter ? 'chip-participated' : 'chip-unselected'}`}>
@@ -107,40 +159,43 @@ export default async function AuditPage({
           </div>
         ) : (
           <div className="divide-y divide-tactical-100">
-            {(logs ?? []).map((log: any) => (
-              <div key={log.id} className="px-5 py-3 flex items-start gap-3 hover:bg-white/40 transition-colors">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent mt-2 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="font-medium text-tactical-900 text-sm">
-                        {log.performed_by_display}
-                      </span>
-                      <span className="text-tactical-500 text-sm"> · </span>
-                      <span className={`text-sm font-medium ${ACTION_COLORS[log.action] ?? 'text-tactical-700'}`}>
-                        {ACTION_LABELS[log.action] ?? log.action.replace(/_/g, ' ')}
+            {(logs ?? []).map((log: any) => {
+              const summary = formatMetadata(log.action, log.metadata ?? {})
+              return (
+                <div key={log.id}
+                     className="px-5 py-3 flex items-start gap-3 hover:bg-white/40 transition-colors">
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent mt-2 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-medium text-tactical-900 text-sm">
+                          {log.performed_by_display}
+                        </span>
+                        <span className="text-tactical-500 text-sm"> · </span>
+                        <span className={`text-sm font-medium ${ACTION_COLORS[log.action] ?? 'text-tactical-700'}`}>
+                          {ACTION_LABELS[log.action] ?? log.action.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <span className="text-xs text-tactical-400 shrink-0 font-mono">
+                        {new Date(log.created_at).toLocaleString('en-GB', {
+                          day: '2-digit', month: 'short',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
                       </span>
                     </div>
-                    <span className="text-xs text-tactical-400 shrink-0 font-mono">
-                      {new Date(log.created_at).toLocaleString('en-GB', {
-                        day: '2-digit', month: 'short',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </span>
+                    {/* Human-readable summary instead of raw JSON */}
+                    {summary && (
+                      <p className="text-xs text-tactical-500 mt-0.5">{summary}</p>
+                    )}
+                    {log.target_commander_uid && (
+                      <p className="text-xs text-tactical-400 mt-0.5">
+                        Target: <span className="font-medium text-tactical-600">{log.target_commander_uid}</span>
+                      </p>
+                    )}
                   </div>
-                  {log.target_commander_uid && (
-                    <p className="text-xs text-tactical-500 mt-0.5">
-                      Target: <span className="font-mono">{log.target_commander_uid}</span>
-                    </p>
-                  )}
-                  {log.metadata && Object.keys(log.metadata).length > 0 && (
-                    <p className="text-xs text-tactical-400 mt-0.5 truncate">
-                      {JSON.stringify(log.metadata)}
-                    </p>
-                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
