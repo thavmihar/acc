@@ -1,8 +1,8 @@
 // app/api/admin/commanders/route.ts
-import { NextResponse }   from 'next/server'
-import { requireAuth }    from '@/lib/firebase/serverAuth'
+import { NextResponse }      from 'next/server'
+import { requireAuth }       from '@/lib/firebase/serverAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { writeAuditLog }  from '@/lib/utils/audit'
+import { writeAuditLog }     from '@/lib/utils/audit'
 
 // GET — fetch all commanders + alliances
 export async function GET() {
@@ -46,11 +46,28 @@ export async function POST(req: Request) {
 
     const supabase = createAdminClient()
 
-    // Check UID uniqueness
+    // Check UID uniqueness — one commander row per game UID
     const { data: existing } = await supabase
       .from('commanders').select('uid').eq('uid', uid.trim()).single()
     if (existing) {
       return NextResponse.json({ error: `Commander UID ${uid} already exists` }, { status: 409 })
+    }
+
+    // If assigning R5, ensure no other R5 exists in that alliance
+    if (role === 'r5' && alliance_id) {
+      const { data: existingR5 } = await supabase
+        .from('commanders')
+        .select('uid, name')
+        .eq('alliance_id', alliance_id)
+        .eq('role', 'r5')
+        .single()
+
+      if (existingR5) {
+        return NextResponse.json(
+          { error: `${existingR5.name} is already R5 of this alliance` },
+          { status: 409 }
+        )
+      }
     }
 
     const { data: commander, error } = await supabase
@@ -67,7 +84,7 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Create alliance history if assigned to alliance
+    // Create alliance history if assigned
     if (alliance_id && commander) {
       const { data: alliance } = await supabase
         .from('alliances').select('tag').eq('id', alliance_id).single()
@@ -110,6 +127,64 @@ export async function PATCH(req: Request) {
 
     const supabase = createAdminClient()
 
+    // Fetch current commander state
+    const { data: current } = await supabase
+      .from('commanders')
+      .select('uid, name, role, alliance_id')
+      .eq('uid', uid)
+      .single()
+
+    if (!current) return NextResponse.json({ error: 'Commander not found' }, { status: 404 })
+
+    // Rule 1 — Only one R5 per alliance
+    if (updates.role === 'r5') {
+      const allianceId = updates.alliance_id ?? current.alliance_id
+      if (allianceId) {
+        const { data: existingR5 } = await supabase
+          .from('commanders')
+          .select('uid, name')
+          .eq('alliance_id', allianceId)
+          .eq('role', 'r5')
+          .neq('uid', uid)
+          .single()
+
+        if (existingR5) {
+          return NextResponse.json(
+            { error: `${existingR5.name} is already R5 of this alliance` },
+            { status: 409 }
+          )
+        }
+      }
+    }
+
+    // Rule 2 — Commander can only be in one alliance
+    // If alliance_id is being changed, close the old history entry
+    if (updates.alliance_id && updates.alliance_id !== current.alliance_id) {
+      const now = new Date().toISOString()
+
+      // Close old alliance membership
+      if (current.alliance_id) {
+        await supabase
+          .from('alliance_history')
+          .update({ left_at: now })
+          .eq('commander_uid', uid)
+          .eq('alliance_id', current.alliance_id)
+          .is('left_at', null)
+      }
+
+      // Open new alliance membership
+      const { data: newAlliance } = await supabase
+        .from('alliances').select('tag').eq('id', updates.alliance_id).single()
+
+      await supabase.from('alliance_history').insert({
+        commander_uid: uid,
+        alliance_id:   updates.alliance_id,
+        alliance_tag:  newAlliance?.tag ?? '',
+        role:          updates.role ?? current.role,
+        joined_at:     now,
+      })
+    }
+
     const { error } = await supabase
       .from('commanders')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -117,7 +192,6 @@ export async function PATCH(req: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Determine audit action
     const action = updates.status === 'disabled'
       ? 'commander_disabled'
       : updates.status === 'active'
@@ -132,7 +206,7 @@ export async function PATCH(req: Request) {
       performed_by_role:    auth.role as any,
       performed_by_display: auth.commander_name,
       target_commander_uid: uid,
-      metadata:             updates,
+      metadata:             { ...updates, previous_role: current.role, previous_alliance: current.alliance_id },
     })
 
     return NextResponse.json({ success: true })
