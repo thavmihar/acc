@@ -179,11 +179,14 @@ export default function DuelEntryPage() {
             <button
               key={opt.mode}
               onClick={() => setSelectedMode(opt.mode)}
-              className={`glass-card p-5 text-left transition-all duration-150 border-2 ${
-                selectedMode === opt.mode
-                  ? 'border-accent bg-accent-light/50'
-                  : 'border-transparent hover:border-tactical-300'
-              }`}
+              className="glass-card p-5 text-left transition-all duration-150"
+              style={selectedMode === opt.mode ? {
+                border: '2px solid #22C55E',
+                background: 'rgba(220,252,231,0.5)',
+                boxShadow: '0 0 0 4px rgba(34,197,94,0.15)',
+              } : {
+                border: '2px solid transparent',
+              }}  
             >
               <div className="flex items-center gap-2 mb-1">
                 <p className="font-semibold text-tactical-900">{opt.title}</p>
