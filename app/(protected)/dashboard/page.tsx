@@ -23,6 +23,7 @@ export default async function DashboardPage() {
 
   const [
     { data: commander },
+    { data: alliance },
     { data: members },
     { data: inactiveMembers },
     { data: recentLogs },
@@ -32,6 +33,26 @@ export default async function DashboardPage() {
       .select('name, role, status')
       .eq('uid', commanderUid)
       .single(),
+
+    allianceId
+      ? supabase
+          .from('alliances')
+          .select(`
+            gift_level,
+            target_1,
+            target_2,
+            target_3,
+            target_4,
+            target_5,
+            target_1_completed,
+            target_2_completed,
+            target_3_completed,
+            target_4_completed,
+            target_5_completed
+          `)
+          .eq('id', allianceId)
+          .single()
+      : Promise.resolve({ data: null }),
 
     allianceId
       ? supabase
@@ -86,6 +107,14 @@ export default async function DashboardPage() {
     alliance_created: 'Alliance created',
   }
 
+  const targets = [
+    { done: alliance?.target_1_completed, text: alliance?.target_1 },
+    { done: alliance?.target_2_completed, text: alliance?.target_2 },
+    { done: alliance?.target_3_completed, text: alliance?.target_3 },
+    { done: alliance?.target_4_completed, text: alliance?.target_4 },
+    { done: alliance?.target_5_completed, text: alliance?.target_5 },
+  ].filter((t) => t.text)
+
   return (
     <div className="flex flex-col gap-5 animate-fade-in">
 
@@ -100,9 +129,7 @@ export default async function DashboardPage() {
 
         <p className="page-subtitle">
           {weekKey} · {role?.toUpperCase()} ·{' '}
-          {allianceId
-            ? 'Alliance active'
-            : 'No alliance assigned'}
+          {allianceId ? 'Alliance active' : 'No alliance assigned'}
         </p>
       </div>
 
@@ -114,12 +141,8 @@ export default async function DashboardPage() {
             <span className="text-xs text-tactical-500 font-medium">
               Active Members
             </span>
-
-            <span className="text-tactical-300 text-lg">
-              👥
-            </span>
+            <span className="text-tactical-300 text-lg">👥</span>
           </div>
-
           <p className="text-2xl font-semibold text-tactical-900 mt-1">
             {activeCount}
           </p>
@@ -130,12 +153,8 @@ export default async function DashboardPage() {
             <span className="text-xs text-tactical-500 font-medium">
               Current Week
             </span>
-
-            <span className="text-tactical-300 text-lg">
-              📅
-            </span>
+            <span className="text-tactical-300 text-lg">📅</span>
           </div>
-
           <p className="text-2xl font-semibold text-tactical-900 mt-1 font-mono text-lg">
             {weekKey.split('-')[1]}
           </p>
@@ -152,23 +171,17 @@ export default async function DashboardPage() {
             <span className="text-xs text-tactical-500 font-medium">
               Inactive Flags
             </span>
-
             <span
               className={`text-lg ${
-                inactiveCount > 0
-                  ? 'text-amber-400'
-                  : 'text-tactical-300'
+                inactiveCount > 0 ? 'text-amber-400' : 'text-tactical-300'
               }`}
             >
               ⚠
             </span>
           </div>
-
           <p
             className={`text-2xl font-semibold mt-1 ${
-              inactiveCount > 0
-                ? 'text-amber-700'
-                : 'text-tactical-900'
+              inactiveCount > 0 ? 'text-amber-700' : 'text-tactical-900'
             }`}
           >
             {inactiveCount}
@@ -180,38 +193,28 @@ export default async function DashboardPage() {
             <span className="text-xs text-tactical-500 font-medium">
               Alliance Status
             </span>
-
-            <span className="text-tactical-300 text-lg">
-              🏰
-            </span>
+            <span className="text-tactical-300 text-lg">🏰</span>
           </div>
-
           <p className="text-sm font-semibold text-green-700 mt-1">
             Active
           </p>
         </div>
+
       </div>
 
       {/* Inactive alert */}
       {isR4Plus && inactiveCount > 0 && (
         <div className="glass-card p-4 border border-amber-300 bg-amber-50/30">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-amber-500 animate-pulse-soft">
-              ⚠
-            </span>
-
+            <span className="text-amber-500 animate-pulse-soft">⚠</span>
             <p className="font-semibold text-amber-800 text-sm">
               {inactiveCount} Inactive Commander
               {inactiveCount !== 1 ? 's' : ''} Flagged
             </p>
           </div>
-
           <div className="flex flex-wrap gap-1.5">
             {(inactiveMembers ?? []).map((m: any) => (
-              <span
-                key={m.uid}
-                className="badge badge-warning"
-              >
+              <span key={m.uid} className="badge badge-warning">
                 {m.name}
               </span>
             ))}
@@ -227,60 +230,36 @@ export default async function DashboardPage() {
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-xs text-tactical-500">
-                  Alliance Overview
-                </p>
-
-                <p className="font-semibold text-tactical-900">
-                  Command Center
-                </p>
+                <p className="text-xs text-tactical-500">Alliance Overview</p>
+                <p className="font-semibold text-tactical-900">Command Center</p>
               </div>
-
               <span className="text-3xl">🏰</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-
               <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">
-                  Members
-                </p>
-
+                <p className="text-xs text-tactical-500">Members</p>
                 <p className="text-xl font-semibold text-tactical-900">
                   {activeCount}/100
                 </p>
               </div>
 
               <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">
-                  Gift Level
-                </p>
-
+                <p className="text-xs text-tactical-500">Gift Level</p>
                 <p className="text-xl font-semibold text-tactical-900">
-                  20
+                  {alliance?.gift_level ?? '-'}
                 </p>
               </div>
 
               <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">
-                  Alliance Rank
-                </p>
-
-                <p className="text-xl font-semibold text-green-700">
-                  #1
-                </p>
+                <p className="text-xs text-tactical-500">Alliance Rank</p>
+                <p className="text-xl font-semibold text-green-700">#1</p>
               </div>
 
               <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">
-                  Status
-                </p>
-
-                <p className="text-xl font-semibold text-green-700">
-                  Active
-                </p>
+                <p className="text-xs text-tactical-500">Status</p>
+                <p className="text-xl font-semibold text-green-700">Active</p>
               </div>
-
             </div>
           </div>
 
@@ -288,36 +267,25 @@ export default async function DashboardPage() {
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-xs text-tactical-500">
-                  Weekly Objectives
-                </p>
-
-                <p className="font-semibold text-tactical-900">
-                  Alliance Targets
-                </p>
+                <p className="text-xs text-tactical-500">Weekly Objectives</p>
+                <p className="font-semibold text-tactical-900">Alliance Targets</p>
               </div>
-
               <span className="text-3xl">🎯</span>
             </div>
 
             <div className="flex flex-col gap-3">
-              {[
-                { done: true, text: 'Maintain 95+ active members' },
-                { done: true, text: 'Secure weekly Dual victory' },
-                { done: false, text: 'Recruit new members' },
-                { done: false, text: 'Increase alliance activity' },
-                { done: false, text: 'Complete weekly objectives' },
-              ].map((obj, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className={obj.done ? 'text-green-500' : 'text-amber-500'}>
-                    {obj.done ? '✓' : '○'}
-                  </span>
-
-                  <span className="text-sm text-tactical-800">
-                    {obj.text}
-                  </span>
-                </div>
-              ))}
+              {targets.length > 0 ? (
+                targets.map((obj, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className={obj.done ? 'text-green-500' : 'text-amber-500'}>
+                      {obj.done ? '✓' : '○'}
+                    </span>
+                    <span className="text-sm text-tactical-800">{obj.text}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-tactical-400">No targets set</p>
+              )}
             </div>
           </div>
 
@@ -326,44 +294,30 @@ export default async function DashboardPage() {
 
       {/* Recent Activity */}
       <div className="glass-card p-5">
-        <p className="font-semibold text-tactical-900 mb-4">
-          Recent Activity
-        </p>
+        <p className="font-semibold text-tactical-900 mb-4">Recent Activity</p>
 
         {(recentLogs ?? []).length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-sm text-tactical-400">
-              No recent activity
-            </p>
+            <p className="text-sm text-tactical-400">No recent activity</p>
           </div>
         ) : (
           <div className="flex flex-col divide-y divide-tactical-100">
             {(recentLogs ?? []).map((log: any) => (
-              <div
-                key={log.id}
-                className="py-3 flex items-start gap-3"
-              >
+              <div key={log.id} className="py-3 flex items-start gap-3">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
-
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-tactical-800">
-                    <span className="font-medium">
-                      {log.performed_by_display}
-                    </span>
+                    <span className="font-medium">{log.performed_by_display}</span>
                     {' · '}
                     {ACTION_LABELS[log.action] ?? log.action}
                   </p>
-
                   <p className="text-xs text-tactical-400 mt-0.5">
-                    {new Date(log.created_at).toLocaleString(
-                      'en-GB',
-                      {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }
-                    )}
+                    {new Date(log.created_at).toLocaleString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </p>
                 </div>
               </div>
