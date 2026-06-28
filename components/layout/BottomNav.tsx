@@ -19,123 +19,117 @@ export default function BottomNav({ role, allianceId }: Props) {
   const allianceBase = allianceId ? `/alliance/${allianceId}` : '#'
 
   const menuItems = [
-    {
-      label: 'Alliance',
-      href: allianceBase,
-    },
-    {
-      label: 'Dual',
-      href: `${allianceBase}/duel`,
-    },
-    {
-      label: 'DSB',
-      href: `${allianceBase}/dsb`,
-    },
-    {
-      label: 'Canyon',
-      href: `${allianceBase}/canyon`,
-    },
-    {
-      label: 'Members',
-      href: `${allianceBase}/members`,
-    },
-    {
-      label: 'Transfers',
-      href: '/transfers',
-    },
+    { label: 'Alliance', href: allianceBase, icon: '🏰' },
+    { label: 'Dual', href: `${allianceBase}/duel`, icon: '⚔️' },
+    { label: 'DSB', href: `${allianceBase}/dsb`, icon: '🏜️' },
+    { label: 'Canyon', href: `${allianceBase}/canyon`, icon: '🌀' },
+    { label: 'Members', href: `${allianceBase}/members`, icon: '👥' },
+    { label: 'Transfers', href: '/transfers', icon: '🔄' },
   ]
 
   if (role === 'supreme') {
     menuItems.push({
       label: 'Admin',
       href: '/admin',
+      icon: '👑',
     })
   }
 
   return (
     <>
-      {/* Alliance Menu */}
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/30"
-            onClick={() => setMenuOpen(false)}
-          />
-
-          <div className="fixed bottom-20 left-4 right-4 z-50 rounded-3xl border border-white/30 bg-white shadow-2xl p-4">
-            <div className="mb-3 text-center text-sm font-semibold text-gray-500">
-              Alliance Menu
-            </div>
-
-            <div className="space-y-2">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={`block rounded-xl px-4 py-3 transition ${
-                    pathname === item.href
-                      ? 'bg-green-100 text-green-700'
-                      : 'hover:bg-gray-100'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </>
+      {/* Background Blur */}
+      {(menuOpen || profileOpen) && (
+        <div
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-md transition-all duration-300"
+          onClick={() => {
+            setMenuOpen(false)
+            setProfileOpen(false)
+          }}
+        />
       )}
 
-      {/* Profile Menu */}
-      {profileOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/30"
-            onClick={() => setProfileOpen(false)}
-          />
-
-          <div className="fixed bottom-20 left-4 right-4 z-50 rounded-3xl border border-white/30 bg-white shadow-2xl p-4">
-            <div className="mb-3 text-center text-sm font-semibold text-gray-500">
-              Profile
-            </div>
-
-            <div className="space-y-2">
-              <Link
-                href="/profile"
-                onClick={() => setProfileOpen(false)}
-                className="block rounded-xl px-4 py-3 hover:bg-gray-100"
-              >
-                Profile
-              </Link>
-
-              <Link
-                href="/settings"
-                onClick={() => setProfileOpen(false)}
-                className="block rounded-xl px-4 py-3 hover:bg-gray-100"
-              >
-                Settings
-              </Link>
-
-              <button
-                className="w-full rounded-xl px-4 py-3 text-left text-red-600 hover:bg-red-50"
-                onClick={() => {
-                  window.location.href = '/logout'
-                }}
-              >
-                Logout
-              </button>
-            </div>
+      {/* Alliance Menu Popup */}
+      {menuOpen && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[88%] max-w-sm rounded-3xl border border-white/50 bg-white/95 backdrop-blur-xl shadow-2xl p-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="text-center mb-4">
+            <div className="text-3xl mb-2">☰</div>
+            <h3 className="text-lg font-semibold text-gray-800">
+              Alliance Menu
+            </h3>
           </div>
-        </>
+
+          <div className="space-y-2">
+            {menuItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className={`flex items-center justify-between rounded-2xl px-4 py-3 transition-all duration-200 ${
+                  pathname === item.href
+                    ? 'bg-green-100 text-green-700'
+                    : 'hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{item.icon}</span>
+                  <span className="font-medium">{item.label}</span>
+                </div>
+
+                <span className="text-gray-400">›</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Profile Popup */}
+      {profileOpen && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[88%] max-w-sm rounded-3xl border border-white/50 bg-white/95 backdrop-blur-xl shadow-2xl p-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="text-center mb-4">
+            <div className="text-3xl mb-2">👤</div>
+            <h3 className="text-lg font-semibold text-gray-800">
+              Profile
+            </h3>
+          </div>
+
+          <div className="space-y-2">
+            <Link
+              href="/profile"
+              onClick={() => setProfileOpen(false)}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3 hover:bg-gray-100 transition"
+            >
+              <span className="text-xl">👤</span>
+              <span>Profile</span>
+            </Link>
+
+            <Link
+              href="/settings"
+              onClick={() => setProfileOpen(false)}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3 hover:bg-gray-100 transition"
+            >
+              <span className="text-xl">⚙️</span>
+              <span>Settings</span>
+            </Link>
+
+            <button
+              onClick={() => {
+                window.location.href = '/logout'
+              }}
+              className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-red-600 hover:bg-red-50 transition"
+            >
+              <span className="text-xl">🚪</span>
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/30 bg-white/95 backdrop-blur-lg">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/30 bg-white/90 backdrop-blur-xl shadow-lg">
         <div className="flex items-center justify-around py-3">
           <Link
             href="/dashboard"
-            className={`flex flex-col items-center gap-1 ${
+            className={`flex flex-col items-center gap-1 transition ${
               pathname === '/dashboard'
                 ? 'text-green-700'
                 : 'text-gray-500'
@@ -150,7 +144,11 @@ export default function BottomNav({ role, allianceId }: Props) {
               setProfileOpen(false)
               setMenuOpen(!menuOpen)
             }}
-            className="flex flex-col items-center gap-1 text-gray-500"
+            className={`flex flex-col items-center gap-1 transition ${
+              menuOpen
+                ? 'text-green-700'
+                : 'text-gray-500'
+            }`}
           >
             <span className="text-2xl">☰</span>
             <span className="text-xs font-medium">Menu</span>
@@ -161,7 +159,11 @@ export default function BottomNav({ role, allianceId }: Props) {
               setMenuOpen(false)
               setProfileOpen(!profileOpen)
             }}
-            className="flex flex-col items-center gap-1 text-gray-500"
+            className={`flex flex-col items-center gap-1 transition ${
+              profileOpen
+                ? 'text-green-700'
+                : 'text-gray-500'
+            }`}
           >
             <span className="text-2xl">👤</span>
             <span className="text-xs font-medium">Profile</span>
