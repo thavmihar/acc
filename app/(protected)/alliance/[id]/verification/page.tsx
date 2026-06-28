@@ -22,6 +22,12 @@ async function verifyCommander(formData: FormData) {
     .update({ verification_status: 'verified' })
     .eq('uid', commanderUid)
 
+  // Mark the code as used so it can't be reused
+  await supabase
+    .from('verification_codes')
+    .update({ used: true })
+    .eq('commander_uid', commanderUid)
+
   await supabase.from('audit_logs').insert({
     action: 'verification_completed',
     performed_by_uid: performedByUid,
@@ -62,14 +68,16 @@ async function rejectCommander(formData: FormData) {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-700 border border-amber-300',
-  rejected: 'bg-red-100 text-red-700 border border-red-300',
+  code_sent:  'bg-blue-100 text-blue-700 border border-blue-300',
+  pending:    'bg-amber-100 text-amber-700 border border-amber-300',
+  rejected:   'bg-red-100 text-red-700 border border-red-300',
   unverified: 'bg-gray-100 text-gray-600 border border-gray-300',
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  rejected: 'Rejected',
+  code_sent:  'Code Sent',
+  pending:    'Pending',
+  rejected:   'Rejected',
   unverified: 'Unverified',
 }
 
@@ -96,15 +104,27 @@ export default async function VerificationPage({
 
   const supabase = createAdminClient()
 
+  // Fetch commanders + their active verification codes in one shot
   const { data: commanders } = await supabase
     .from('commanders')
-    .select('uid, name, role, verification_status')
+    .select(`
+      uid,
+      name,
+      role,
+      verification_status,
+      verification_codes (
+        code,
+        expires_at,
+        used,
+        attempt_count
+      )
+    `)
     .eq('alliance_id', allianceId)
-    .neq('verification_status', 'verified')
+    .not('verification_status', 'in', '("linked","verified")')
     .order('verification_status', { ascending: true })
 
   const pendingCount = (commanders ?? []).filter(
-    (c) => c.verification_status === 'pending'
+    (c) => c.verification_status === 'code_sent' || c.verification_status === 'pending'
   ).length
 
   return (
@@ -135,72 +155,129 @@ export default async function VerificationPage({
           </div>
         ) : (
           <div className="flex flex-col divide-y divide-tactical-100">
-            {commanders.map((commander) => (
-              <div
-                key={commander.uid}
-                className="py-4 flex items-center justify-between gap-4"
-              >
-                {/* Commander Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-tactical-900 truncate">
-                    {commander.name}
-                  </p>
+            {commanders.map((commander) => {
+              // verification_codes is a one-to-one join — Supabase returns array
+              const codeRecord = Array.isArray(commander.verification_codes)
+                ? commander.verification_codes[0]
+                : commander.verification_codes
 
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-tactical-500 uppercase font-medium">
-                      {commander.role}
-                    </span>
+              const hasActiveCode =
+                codeRecord &&
+                !codeRecord.used &&
+                new Date(codeRecord.expires_at) > new Date()
 
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        STATUS_STYLES[commander.verification_status] ??
-                        STATUS_STYLES.unverified
-                      }`}
-                    >
-                      {STATUS_LABELS[commander.verification_status] ??
-                        commander.verification_status}
-                    </span>
+              const isExpired =
+                codeRecord &&
+                !codeRecord.used &&
+                new Date(codeRecord.expires_at) <= new Date()
+
+              return (
+                <div key={commander.uid} className="py-4 flex flex-col gap-3">
+
+                  {/* Top row — name, role, status */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-tactical-900 truncate">
+                        {commander.name}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-tactical-500 uppercase font-medium">
+                          {commander.role}
+                        </span>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            STATUS_STYLES[commander.verification_status] ??
+                            STATUS_STYLES.unverified
+                          }`}
+                        >
+                          {STATUS_LABELS[commander.verification_status] ??
+                            commander.verification_status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2 shrink-0">
+
+                      {/* Verify */}
+                      <form action={verifyCommander}>
+                        <input type="hidden" name="commanderUid" value={commander.uid} />
+                        <input type="hidden" name="performedByUid" value={commanderUid} />
+                        <input type="hidden" name="performedByName" value={commanderName} />
+                        <input type="hidden" name="allianceId" value={allianceId} />
+                        <button
+                          type="submit"
+                          className="text-xs px-3 py-1.5 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+                        >
+                          ✓ Verify
+                        </button>
+                      </form>
+
+                      {/* Reject — hide if already rejected */}
+                      {commander.verification_status !== 'rejected' && (
+                        <form action={rejectCommander}>
+                          <input type="hidden" name="commanderUid" value={commander.uid} />
+                          <input type="hidden" name="performedByUid" value={commanderUid} />
+                          <input type="hidden" name="performedByName" value={commanderName} />
+                          <input type="hidden" name="allianceId" value={allianceId} />
+                          <button
+                            type="submit"
+                            className="text-xs px-3 py-1.5 rounded-xl border border-red-300 text-red-600 font-medium hover:bg-red-50 transition-colors"
+                          >
+                            ✕ Reject
+                          </button>
+                        </form>
+                      )}
+
+                    </div>
                   </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0">
+                  {/* Verification code box — shown when code is active */}
+                  {hasActiveCode && (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/50 px-4 py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-blue-600 font-medium mb-0.5">
+                          Verification Code — send this in-game
+                        </p>
+                        <p className="font-mono text-xl font-bold text-blue-800 tracking-[0.3em]">
+                          {codeRecord.code}
+                        </p>
+                        <p className="text-xs text-blue-500 mt-0.5">
+                          Expires{' '}
+                          {new Date(codeRecord.expires_at).toLocaleTimeString('en-GB', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                          {' · '}
+                          {codeRecord.attempt_count}/{3} attempts used
+                        </p>
+                      </div>
+                      <span className="text-2xl">📨</span>
+                    </div>
+                  )}
 
-                  {/* Verify */}
-                  <form action={verifyCommander}>
-                    <input type="hidden" name="commanderUid" value={commander.uid} />
-                    <input type="hidden" name="performedByUid" value={commanderUid} />
-                    <input type="hidden" name="performedByName" value={commanderName} />
-                    <input type="hidden" name="allianceId" value={allianceId} />
+                  {/* Expired code warning */}
+                  {isExpired && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3">
+                      <p className="text-xs text-amber-700 font-medium">
+                        ⏱ Code expired — commander must request a new one from{' '}
+                        <span className="font-mono">/verify/{commander.uid}</span>
+                      </p>
+                    </div>
+                  )}
 
-                    <button
-                      type="submit"
-                      className="text-xs px-3 py-1.5 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
-                    >
-                      ✓ Verify
-                    </button>
-                  </form>
-
-                  {/* Reject — only if not already rejected */}
-                  {commander.verification_status !== 'rejected' && (
-                    <form action={rejectCommander}>
-                      <input type="hidden" name="commanderUid" value={commander.uid} />
-                      <input type="hidden" name="performedByUid" value={commanderUid} />
-                      <input type="hidden" name="performedByName" value={commanderName} />
-                      <input type="hidden" name="allianceId" value={allianceId} />
-
-                      <button
-                        type="submit"
-                        className="text-xs px-3 py-1.5 rounded-xl border border-red-300 text-red-600 font-medium hover:bg-red-50 transition-colors"
-                      >
-                        ✕ Reject
-                      </button>
-                    </form>
+                  {/* No code yet */}
+                  {!codeRecord && commander.verification_status !== 'rejected' && (
+                    <div className="rounded-xl border border-tactical-100 bg-surface-overlay px-4 py-3">
+                      <p className="text-xs text-tactical-400">
+                        No code requested yet — commander hasn't started verification
+                      </p>
+                    </div>
                   )}
 
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
