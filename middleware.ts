@@ -7,7 +7,7 @@ const SESSION_COOKIE = '__acc_session'
 
 const PUBLIC_ROUTES   = ['/', '/login', '/register']
 const PUBLIC_PREFIXES = ['/verify', '/api/auth', '/_next', '/favicon', '/api/verify']
-const SUPREME_ONLY    = ['/admin']
+const SUPREME_ONLY    = ['/admin', '/supreme-dashboard']
 const R4_PATHS        = ['/register', '/attendance', '/transfers']
 
 interface DecodedClaims {
@@ -68,14 +68,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Supreme-only routes
+  // ── Supreme split: send supreme straight to its own dashboard ──
+  // Anyone with role === 'supreme' landing on /dashboard (the R1–R5
+  // route) gets redirected to /supreme-dashboard instead.
+  if (role === 'supreme' && pathname === '/dashboard') {
+    return NextResponse.redirect(new URL('/supreme-dashboard', request.url))
+  }
+
+  // Non-supreme users can never enter supreme-only routes (also includes
+  // /admin, already covered below, plus /supreme-dashboard explicitly).
+  if (role !== 'supreme' && pathname.startsWith('/supreme-dashboard')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Supreme-only routes (unchanged from before, now also covers
+  // /supreme-dashboard via the SUPREME_ONLY array update above)
   if (SUPREME_ONLY.some(p => pathname.startsWith(p)) && role !== 'supreme') {
     return NextResponse.redirect(new URL('/dashboard?error=access_denied', request.url))
   }
 
   // R4+ routes
   const isR4Route = R4_PATHS.some(p => pathname.includes(p))
-  if (isR4Route && !['r4','r5','supreme'].includes(role)) {
+  if (isR4Route && !['r4', 'r5', 'supreme'].includes(role)) {
     const base = alliance_id ? `/alliance/${alliance_id}` : '/dashboard'
     return NextResponse.redirect(new URL(base, request.url))
   }
