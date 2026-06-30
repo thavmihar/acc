@@ -1,3 +1,4 @@
+// app/(supreme)/supreme-dashboard/page.tsx
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getWeekKey }        from '@/lib/utils/utc2'
 
@@ -23,9 +24,11 @@ export default async function SupremeDashboardPage() {
   const canyonList      = canyonEvents ?? []
 
   const totalAlliances  = allianceList.length
+  const activeAlliances = allianceList.filter(a => a.status === 'active').length
   const totalCommanders = commanderList.length
   const linkedCount     = commanderList.filter(c => c.verification_status === 'linked').length
 
+  // Per-alliance stats
   const allianceStats = allianceList.map(alliance => {
     const members       = commanderList.filter(c => c.alliance_id === alliance.id)
     const activeCount   = members.filter(m => m.status === 'active').length
@@ -60,6 +63,7 @@ export default async function SupremeDashboardPage() {
   return (
     <div className="flex flex-col gap-4 animate-fade-in">
 
+      {/* Header */}
       <div className="glass-card p-4 flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-accent flex items-center justify-center shrink-0">
           <span className="text-white font-bold text-sm">👑</span>
@@ -70,6 +74,7 @@ export default async function SupremeDashboardPage() {
         </div>
       </div>
 
+      {/* Global stats — single compact strip, not 4 tall blocks */}
       <div className="glass-card p-3 grid grid-cols-4 divide-x divide-tactical-100">
         <div className="px-2 text-center">
           <p className="text-base font-semibold text-tactical-900 leading-tight">{totalAlliances}</p>
@@ -91,6 +96,7 @@ export default async function SupremeDashboardPage() {
         </div>
       </div>
 
+      {/* Per-alliance overview — condensed single-row cards */}
       <div className="flex flex-col gap-2">
         <p className="text-sm font-semibold text-tactical-700 px-1">Alliance Overview</p>
 
