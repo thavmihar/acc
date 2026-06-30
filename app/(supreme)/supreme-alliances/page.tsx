@@ -73,16 +73,16 @@ export default function SupremeAlliancesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5 animate-fade-in">
+    <div className="flex flex-col gap-4 animate-fade-in min-w-0">
 
       {/* Header */}
-      <div className="glass-card p-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-tactical-900">Alliances</h1>
-          <p className="text-xs text-tactical-500 mt-0.5">{alliances.length} total</p>
+      <div className="glass-card p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold text-tactical-900">Alliances</h1>
+          <p className="text-[11px] text-tactical-500 mt-0.5">{alliances.length} total</p>
         </div>
-        <button onClick={openCreate} className="btn-primary text-sm">
-          + New Alliance
+        <button onClick={openCreate} className="btn-primary text-xs sm:text-sm shrink-0 px-3 py-2">
+          + New
         </button>
       </div>
 
@@ -96,19 +96,19 @@ export default function SupremeAlliancesPage() {
           <p className="text-sm text-tactical-400">No alliances yet. Create one above.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {alliances.map(a => (
-            <div key={a.id} className="glass-card p-4 flex items-center justify-between gap-3">
+            <div key={a.id} className="glass-card p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-accent-light flex items-center justify-center shrink-0">
-                  <span className="font-bold text-accent-deep text-xs">[{a.tag}]</span>
+                <div className="w-9 h-9 rounded-xl bg-accent-light flex items-center justify-center shrink-0">
+                  <span className="font-bold text-accent-deep text-[11px]">[{a.tag}]</span>
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-tactical-900 text-sm truncate">{a.name}</p>
-                  <p className="text-xs text-tactical-500">Created by: {a.created_by_supreme}</p>
+                  <p className="text-[11px] text-tactical-500 truncate">By: {a.created_by_supreme}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                 <span className={`badge ${a.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>
                   {a.status}
                 </span>
@@ -125,11 +125,14 @@ export default function SupremeAlliancesPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal — mobile-safe: bottom sheet on small screens, centered on desktop */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)' }}>
-          <div className="glass-card-raised w-full max-w-sm p-6 flex flex-col gap-4">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          style={{ background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)' }}
+        >
+          <div className="glass-card-raised w-full sm:max-w-sm max-h-[85vh] overflow-y-auto
+                           rounded-t-2xl sm:rounded-2xl p-5 flex flex-col gap-4">
             <h2 className="font-semibold text-tactical-900">
               {modalMode === 'create' ? 'Create Alliance' : `Edit [${selected?.tag}]`}
             </h2>
@@ -185,7 +188,7 @@ export default function SupremeAlliancesPage() {
               </div>
             )}
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pb-1">
               <button onClick={closeModal} disabled={saving}
                       className="flex-1 px-4 py-2 rounded-xl border border-tactical-200
                                  text-sm font-medium text-tactical-600 hover:bg-tactical-50">

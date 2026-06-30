@@ -25,30 +25,26 @@ export default function SupremeLayout({
           ⌂ Dashboard
         </Link>
 
-        <Link href="/supreme-commanders" className="p-3 rounded-lg hover:bg-slate-100">
-          ◉ Commanders
-        </Link>
-
         <Link href="/supreme-alliances" className="p-3 rounded-lg hover:bg-slate-100">
           ◈ Alliances
         </Link>
 
-        <Link href="/supreme-verification" className="p-3 rounded-lg hover:bg-slate-100">
-          ✅ Verification
+        <Link href="/supreme-commanders" className="p-3 rounded-lg hover:bg-slate-100">
+          ◉ Commanders
         </Link>
 
         <Link href="/supreme-audit" className="p-3 rounded-lg hover:bg-slate-100">
           ≡ Audit Log
         </Link>
 
-        <Link href="/supreme-admin" className="p-3 rounded-lg hover:bg-slate-100">
-          👑 Admin
+        <Link href="/supreme-verification" className="p-3 rounded-lg hover:bg-slate-100">
+          ✅ Verification
         </Link>
 
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 pb-24 lg:pb-6">
+      <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 min-w-0">
         {children}
       </main>
 
