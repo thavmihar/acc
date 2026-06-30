@@ -1,288 +1,157 @@
 // app/(supreme)/supreme-dashboard/page.tsx
-// NOTE: path renamed from "dashboard" to "supreme-dashboard" — route groups
-// like (protected) and (supreme) are invisible in the URL, so a folder
-// named "dashboard" inside BOTH groups collides on the same /dashboard path.
-// This is what caused the Turbopack build error.
-
-import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
-import UTCClock from '@/components/layout/UTCClock'
-import { getWeekKey } from '@/lib/utils/utc2'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getWeekKey }        from '@/lib/utils/utc2'
 
 export default async function SupremeDashboardPage() {
-  const headersList = await headers()
-
-  const commanderUid = headersList.get('x-commander-uid')
-  const role = headersList.get('x-commander-role')
-
-  if (!commanderUid || role !== 'supreme') {
-    redirect('/login')
-  }
-
-  const { createAdminClient } = await import('@/lib/supabase/admin')
   const supabase = createAdminClient()
-  const weekKey = getWeekKey()
+  const weekKey  = getWeekKey()
 
   const [
-    { data: commander },
     { data: alliances },
-    { data: allCommanders },
-    { data: inactiveMembers },
-    { data: recentLogs },
+    { data: commanders },
+    { data: dsbEvents },
+    { data: canyonEvents },
   ] = await Promise.all([
-    supabase
-      .from('commanders')
-      .select('name, role, status')
-      .eq('uid', commanderUid)
-      .single(),
-
-    // Supreme sees every alliance, not just one
-    supabase
-      .from('alliances')
-      .select(`
-        id,
-        tag,
-        gift_level,
-        target_1,
-        target_2,
-        target_3,
-        target_4,
-        target_5,
-        target_1_completed,
-        target_2_completed,
-        target_3_completed,
-        target_4_completed,
-        target_5_completed
-      `),
-
-    // Every active commander across all alliances
-    supabase
-      .from('commanders')
-      .select('uid, name, status, inactive_flagged, alliance_id')
-      .eq('status', 'active'),
-
-    // Every flagged-inactive commander, across all alliances
-    supabase
-      .from('commanders')
-      .select('uid, name, inactive_flagged_at, alliance_id')
-      .eq('inactive_flagged', true)
-      .order('inactive_flagged_at', { ascending: false })
-      .limit(10),
-
-    // Global audit log, not scoped to a single alliance
-    supabase
-      .from('audit_logs')
-      .select(
-        'id, action, performed_by_display, target_commander_uid, target_alliance_id, created_at'
-      )
-      .order('created_at', { ascending: false })
-      .limit(8),
+    supabase.from('alliances').select('id, tag, name, status'),
+    supabase.from('commanders').select('uid, name, role, status, alliance_id, verification_status'),
+    supabase.from('dsb_events').select('alliance_id, state').eq('week_key', weekKey),
+    supabase.from('canyon_events').select('alliance_id, state').eq('week_key', weekKey),
   ])
 
-  const allianceCount = (alliances ?? []).length
-  const activeCount = (allCommanders ?? []).length
-  const inactiveCount = (inactiveMembers ?? []).length
+  const allianceList    = alliances    ?? []
+  const commanderList   = commanders   ?? []
+  const dsbList         = dsbEvents    ?? []
+  const canyonList      = canyonEvents ?? []
 
-  const ACTION_LABELS: Record<string, string> = {
-    commander_created: 'Commander added',
-    commander_updated: 'Commander updated',
-    commander_disabled: 'Account disabled',
-    role_changed: 'Role changed',
-    member_added: 'Member added',
-    member_removed: 'Member removed',
-    transfer_approved: 'Transfer approved',
-    transfer_rejected: 'Transfer rejected',
-    verification_completed: 'Commander verified',
-    duel_day_locked: 'Duel day locked',
-    dsb_team_updated: 'DSB roster updated',
-    canyon_team_updated: 'Canyon roster updated',
-    dsb_attendance_recorded: 'DSB attendance recorded',
-    canyon_attendance_recorded: 'Canyon attendance recorded',
-    inactive_flagged: 'Inactive flag set',
-    alliance_created: 'Alliance created',
+  const totalAlliances  = allianceList.length
+  const activeAlliances = allianceList.filter(a => a.status === 'active').length
+  const totalCommanders = commanderList.length
+  const linkedCount     = commanderList.filter(c => c.verification_status === 'linked').length
+
+  // Per-alliance stats
+  const allianceStats = allianceList.map(alliance => {
+    const members      = commanderList.filter(c => c.alliance_id === alliance.id)
+    const activeCount  = members.filter(m => m.status === 'active').length
+    const linkedMembers= members.filter(m => m.verification_status === 'linked').length
+    const dsbEvent     = dsbList.find(e => e.alliance_id === alliance.id)
+    const canyonEvent  = canyonList.find(e => e.alliance_id === alliance.id)
+    return {
+      ...alliance,
+      totalMembers:  members.length,
+      activeMembers: activeCount,
+      linkedMembers,
+      dsbState:      dsbEvent?.state    ?? null,
+      canyonState:   canyonEvent?.state ?? null,
+    }
+  })
+
+  const STATE_COLOR: Record<string, string> = {
+    pending:              'badge-inactive',
+    registration_open:    'badge-active',
+    registration_closed:  'badge-warning',
+    battle:               'badge-warning',
+    complete:             'badge-active',
+  }
+  const STATE_LABEL: Record<string, string> = {
+    pending:              'Pending',
+    registration_open:    'Open',
+    registration_closed:  'Closed',
+    battle:               'Battle',
+    complete:             'Complete',
   }
 
   return (
     <div className="flex flex-col gap-5 animate-fade-in">
 
-      {/* UTC-2 Clock */}
-      <UTCClock />
-
-      {/* Welcome */}
-      <div>
-        <h1 className="page-title">
-          Welcome, {commander?.name ?? commanderUid}
-        </h1>
-
-        <p className="page-subtitle">
-          {weekKey} · SUPREME · Server-wide view
-        </p>
-      </div>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-tactical-500 font-medium">
-              Total Commanders
-            </span>
-            <span className="text-tactical-300 text-lg">👥</span>
-          </div>
-          <p className="text-2xl font-semibold text-tactical-900 mt-1">
-            {activeCount}
-          </p>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-tactical-500 font-medium">
-              Alliances
-            </span>
-            <span className="text-tactical-300 text-lg">🏰</span>
-          </div>
-          <p className="text-2xl font-semibold text-tactical-900 mt-1">
-            {allianceCount}
-          </p>
-        </div>
-
-        <div
-          className={`stat-card ${
-            inactiveCount > 0
-              ? 'border border-amber-300 bg-amber-50/40'
-              : ''
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-tactical-500 font-medium">
-              Inactive Flags
-            </span>
-            <span
-              className={`text-lg ${
-                inactiveCount > 0 ? 'text-amber-400' : 'text-tactical-300'
-              }`}
-            >
-              ⚠
-            </span>
-          </div>
-          <p
-            className={`text-2xl font-semibold mt-1 ${
-              inactiveCount > 0 ? 'text-amber-700' : 'text-tactical-900'
-            }`}
-          >
-            {inactiveCount}
-          </p>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-tactical-500 font-medium">
-              Current Week
-            </span>
-            <span className="text-tactical-300 text-lg">📅</span>
-          </div>
-          <p className="text-2xl font-semibold text-tactical-900 mt-1 font-mono text-lg">
-            {weekKey.split('-')[1]}
-          </p>
-        </div>
-
-      </div>
-
-      {/* Inactive alert — server-wide, not single-alliance */}
-      {inactiveCount > 0 && (
-        <div className="glass-card p-4 border border-amber-300 bg-amber-50/30">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-amber-500 animate-pulse-soft">⚠</span>
-            <p className="font-semibold text-amber-800 text-sm">
-              {inactiveCount} Inactive Commander
-              {inactiveCount !== 1 ? 's' : ''} Flagged Server-Wide
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {(inactiveMembers ?? []).map((m: any) => (
-              <span key={m.uid} className="badge badge-warning">
-                {m.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Alliance Overview Grid — one card per alliance */}
+      {/* Header */}
       <div className="glass-card p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
+            <span className="text-white font-bold text-base">👑</span>
+          </div>
           <div>
-            <p className="text-xs text-tactical-500">Server Overview</p>
-            <p className="font-semibold text-tactical-900">All Alliances</p>
+            <h1 className="text-xl font-semibold text-tactical-900">Supreme Dashboard</h1>
+            <p className="text-xs text-tactical-500 mt-0.5 font-mono">Week: {weekKey}</p>
           </div>
-          <a
-            href="/admin"
-            className="text-xs px-2.5 py-1 rounded-lg border border-tactical-200 text-tactical-500 hover:border-accent hover:text-accent transition-colors"
-          >
-            Manage →
-          </a>
         </div>
-
-        {(alliances ?? []).length === 0 ? (
-          <p className="text-sm text-tactical-400">No alliances found</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(alliances ?? []).map((a: any) => {
-              const memberCount = (allCommanders ?? []).filter(
-                (c: any) => c.alliance_id === a.id
-              ).length
-              return (
-                <div
-                  key={a.id}
-                  className="rounded-xl bg-surface-overlay p-3 flex flex-col gap-1"
-                >
-                  <p className="text-sm font-semibold text-tactical-900">
-                    {a.tag}
-                  </p>
-                  <p className="text-xs text-tactical-500">
-                    {memberCount}/100 members · Gift Lv {a.gift_level ?? '-'}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        )}
       </div>
 
-      {/* Recent Activity — global, across all alliances */}
-      <div className="glass-card p-5">
-        <p className="font-semibold text-tactical-900 mb-4">
-          Recent Activity (Server-Wide)
-        </p>
+      {/* Global stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card">
+          <span className="text-xs text-tactical-500">Total Alliances</span>
+          <p className="text-2xl font-semibold text-tactical-900 mt-1">{totalAlliances}</p>
+          <p className="text-xs text-tactical-500 mt-1">{activeAlliances} active</p>
+        </div>
+        <div className="stat-card">
+          <span className="text-xs text-tactical-500">Total Commanders</span>
+          <p className="text-2xl font-semibold text-tactical-900 mt-1">{totalCommanders}</p>
+          <p className="text-xs text-tactical-500 mt-1">{linkedCount} linked</p>
+        </div>
+        <div className="stat-card">
+          <span className="text-xs text-tactical-500">DSB Events</span>
+          <p className="text-2xl font-semibold text-tactical-900 mt-1">{dsbList.length}</p>
+          <p className="text-xs text-tactical-500 mt-1">this week</p>
+        </div>
+        <div className="stat-card">
+          <span className="text-xs text-tactical-500">Canyon Events</span>
+          <p className="text-2xl font-semibold text-tactical-900 mt-1">{canyonList.length}</p>
+          <p className="text-xs text-tactical-500 mt-1">this week</p>
+        </div>
+      </div>
 
-        {(recentLogs ?? []).length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-tactical-400">No recent activity</p>
-          </div>
-        ) : (
-          <div className="flex flex-col divide-y divide-tactical-100">
-            {(recentLogs ?? []).map((log: any) => (
-              <div key={log.id} className="py-3 flex items-start gap-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-tactical-800">
-                    <span className="font-medium">{log.performed_by_display}</span>
-                    {' · '}
-                    {ACTION_LABELS[log.action] ?? log.action}
-                  </p>
-                  <p className="text-xs text-tactical-400 mt-0.5">
-                    {new Date(log.created_at).toLocaleString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </div>
-              </div>
-            ))}
+      {/* Per-alliance overview */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold text-tactical-700 px-1">Alliance Overview</p>
+
+        {allianceStats.length === 0 && (
+          <div className="glass-card p-6 text-center">
+            <p className="text-sm text-tactical-400">No alliances found.</p>
           </div>
         )}
+
+        {allianceStats.map(a => (
+          <div key={a.id} className="glass-card p-4">
+            {/* Alliance name row */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-accent-deep text-sm">[{a.tag}]</span>
+                <span className="text-sm font-medium text-tactical-900">{a.name}</span>
+              </div>
+              <span className={`badge ${a.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>
+                {a.status}
+              </span>
+            </div>
+
+            {/* Members */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <div className="p-2 rounded-lg bg-surface-overlay text-center">
+                <p className="text-xs text-tactical-500">Members</p>
+                <p className="font-semibold text-tactical-900 text-sm">{a.totalMembers}/100</p>
+              </div>
+              <div className="p-2 rounded-lg bg-surface-overlay text-center">
+                <p className="text-xs text-tactical-500">Active</p>
+                <p className="font-semibold text-tactical-900 text-sm">{a.activeMembers}</p>
+              </div>
+              <div className="p-2 rounded-lg bg-surface-overlay text-center">
+                <p className="text-xs text-tactical-500">Linked</p>
+                <p className="font-semibold text-tactical-900 text-sm">{a.linkedMembers}</p>
+              </div>
+            </div>
+
+            {/* Event states */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-tactical-500">DSB:</span>
+              <span className={`badge ${a.dsbState ? STATE_COLOR[a.dsbState] : 'badge-inactive'}`}>
+                {a.dsbState ? STATE_LABEL[a.dsbState] : 'No Event'}
+              </span>
+              <span className="text-xs text-tactical-500 ml-2">Canyon:</span>
+              <span className={`badge ${a.canyonState ? STATE_COLOR[a.canyonState] : 'badge-inactive'}`}>
+                {a.canyonState ? STATE_LABEL[a.canyonState] : 'No Event'}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
 
     </div>
