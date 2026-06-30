@@ -1,5 +1,4 @@
 'use client'
-// app/(supreme)/supreme-alliances/page.tsx
 import { useEffect, useState } from 'react'
 
 interface Alliance {
@@ -21,7 +20,6 @@ export default function SupremeAlliancesPage() {
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
-  // Form state
   const [tag,    setTag]    = useState('')
   const [name,   setName]   = useState('')
   const [status, setStatus] = useState('active')
@@ -75,7 +73,6 @@ export default function SupremeAlliancesPage() {
   return (
     <div className="flex flex-col gap-4 animate-fade-in min-w-0">
 
-      {/* Header */}
       <div className="glass-card p-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-tactical-900">Alliances</h1>
@@ -86,7 +83,6 @@ export default function SupremeAlliancesPage() {
         </button>
       </div>
 
-      {/* List */}
       {loading ? (
         <div className="glass-card p-8 text-center">
           <p className="text-sm text-tactical-400">Loading…</p>
@@ -125,7 +121,6 @@ export default function SupremeAlliancesPage() {
         </div>
       )}
 
-      {/* Modal — mobile-safe: bottom sheet on small screens, centered on desktop */}
       {modalMode && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
