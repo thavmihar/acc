@@ -76,6 +76,24 @@ export default function AdminCommandersPage() {
     fetchData()
   }
 
+  const handleUnlink = async (uid: string, name: string) => {
+    const confirmed = window.confirm(
+      `Unlink ${name}'s Google account?\n\nThis does NOT delete the commander, their history, or their stats. It only removes the Google account link so a new one can be linked via re-registration.`
+    )
+    if (!confirmed) return
+
+    setMsg('')
+    const res  = await fetch('/api/admin/commanders', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ uid, action: 'unlink_google' }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setMsg(data.error); return }
+    setMsg(`${name}'s Google account has been unlinked`)
+    fetchData()
+  }
+
   const filtered = commanders.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.uid.toLowerCase().includes(search.toLowerCase())
@@ -224,12 +242,23 @@ export default function AdminCommandersPage() {
                       </span>
                     </td>
                     <td>
-                      <button
-                        onClick={() => handleDisable(c.uid, c.status !== 'disabled')}
-                        className={c.status === 'disabled' ? 'btn-ghost text-xs py-1 px-2' : 'btn-danger text-xs py-1 px-2'}
-                      >
-                        {c.status === 'disabled' ? 'Enable' : 'Disable'}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleDisable(c.uid, c.status !== 'disabled')}
+                          className={c.status === 'disabled' ? 'btn-ghost text-xs py-1 px-2' : 'btn-danger text-xs py-1 px-2'}
+                        >
+                          {c.status === 'disabled' ? 'Enable' : 'Disable'}
+                        </button>
+                        {c.linked_google_uid && (
+                          <button
+                            onClick={() => handleUnlink(c.uid, c.name)}
+                            className="btn-secondary text-xs py-1 px-2"
+                            title="Remove this commander's Google account link"
+                          >
+                            Unlink
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

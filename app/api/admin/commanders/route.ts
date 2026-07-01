@@ -122,7 +122,7 @@ export async function PATCH(req: Request) {
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'supreme') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { uid, ...updates } = await req.json()
+    const { uid, action, ...updates } = await req.json()
     if (!uid) return NextResponse.json({ error: 'uid required' }, { status: 400 })
 
     const supabase = createAdminClient()
@@ -130,11 +130,59 @@ export async function PATCH(req: Request) {
     // Fetch current commander state
     const { data: current } = await supabase
       .from('commanders')
-      .select('uid, name, role, alliance_id')
+      .select('uid, name, role, alliance_id, linked_google_uid')
       .eq('uid', uid)
       .single()
 
     if (!current) return NextResponse.json({ error: 'Commander not found' }, { status: 404 })
+
+    // ── ACTION: unlink_google ──────────────────
+    // Supreme-only. Removes the Google account link WITHOUT deleting the
+    // commander identity, role, alliance history, audit history, or stats.
+    // After this, the commander can go through /register again to link a
+    // new Google account.
+    if (action === 'unlink_google') {
+      if (!current.linked_google_uid) {
+        return NextResponse.json({ error: 'This commander has no linked Google account' }, { status: 400 })
+      }
+
+      const oldGoogleUid = current.linked_google_uid
+
+      const { error } = await supabase
+        .from('commanders')
+        .update({
+          linked_google_uid:   null,
+          verification_status: 'verified', // eligible to re-link, identity preserved
+          updated_at:          new Date().toISOString(),
+        })
+        .eq('uid', uid)
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      // Revoke any active sessions tied to the old Google account
+      try {
+        const { adminAuth } = await import('@/lib/firebase/admin')
+        await adminAuth.revokeRefreshTokens(oldGoogleUid)
+      } catch {
+        // non-fatal — session will still expire naturally
+      }
+
+      await writeAuditLog({
+        action:               'google_account_unlinked' as any,
+        performed_by:         auth.commander_uid,
+        performed_by_role:    auth.role as any,
+        performed_by_display: auth.commander_name,
+        target_commander_uid: uid,
+        target_alliance_id:   current.alliance_id,
+        metadata: {
+          commander_uid:  uid,
+          old_google_uid: oldGoogleUid,
+          unlinked_by:    'supreme',
+        },
+      })
+
+      return NextResponse.json({ success: true })
+    }
 
     // Rule 1 — Only one R5 per alliance
     if (updates.role === 'r5') {
@@ -192,7 +240,7 @@ export async function PATCH(req: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const action = updates.status === 'disabled'
+    const auditAction = updates.status === 'disabled'
       ? 'commander_disabled'
       : updates.status === 'active'
         ? 'commander_enabled'
@@ -201,7 +249,7 @@ export async function PATCH(req: Request) {
           : 'commander_updated'
 
     await writeAuditLog({
-      action:               action as any,
+      action:               auditAction as any,
       performed_by:         auth.commander_uid,
       performed_by_role:    auth.role as any,
       performed_by_display: auth.commander_name,
