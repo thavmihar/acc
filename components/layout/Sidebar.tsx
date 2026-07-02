@@ -26,7 +26,10 @@ const NAV: NavItem[] = [
   { label: 'Canyon',            href: '/alliance/[id]/canyon',         icon: '◇',  roles: ['r1','r2','r3','r4','r5','supreme'] },
   { label: 'Transfers',         href: '/transfers',                    icon: '⇄',  roles: ['r1','r2','r3','r4','r5','supreme'], divider: true },
   // ── R4 + R5 + Supreme ─────────────────────────────────────────────────────
-  { label: 'Verification',      href: '/alliance/[id]/verification',   icon: '✅', roles: ['r4','r5','supreme'], divider: true },
+  // Verification is a unified route (not alliance-scoped) because Supreme
+  // has no fixed allianceId — resolve() would otherwise leave the literal
+  // "[id]" in the URL for Supreme and 404.
+  { label: 'Verification',      href: '/verification',                 icon: '✅', roles: ['r4','r5','supreme'], divider: true },
   { label: 'Alliance Settings', href: '/alliance/[id]/settings',       icon: '⚙',  roles: ['r4','r5','supreme'] },
   // ── Supreme only ──────────────────────────────────────────────────────────
   { label: 'Audit Log',         href: '/audit',                        icon: '≡',  roles: ['supreme'], divider: true },
@@ -54,7 +57,12 @@ export default function Sidebar({ role, allianceId, commanderName, allianceTag }
     return pathname === resolved || pathname.startsWith(resolved + '/')
   }
 
-  const visible = NAV.filter(n => n.roles.includes(role))
+  // Items whose href still needs an alliance id (contains "[id]") are
+  // hidden entirely when there's no allianceId (e.g. Supreme), instead of
+  // rendering a dead link with literal brackets in the URL.
+  const visible = NAV.filter(
+    n => n.roles.includes(role) && (allianceId || !n.href.includes('[id]'))
+  )
 
   const handleSignOut = async () => {
     setSigningOut(true)
