@@ -115,7 +115,7 @@ export async function POST(req: Request) {
   }
 }
 
-// PATCH — update commander (status, role, alliance)
+// PATCH — update commander (status, role, alliance) or run a named action
 export async function PATCH(req: Request) {
   try {
     const auth = await requireAuth()
@@ -207,7 +207,7 @@ export async function PATCH(req: Request) {
 
     // Rule 2 — Commander can only be in one alliance
     // If alliance_id is being changed, close the old history entry
-    if (updates.alliance_id && updates.alliance_id !== current.alliance_id) {
+    if (updates.alliance_id !== undefined && updates.alliance_id !== current.alliance_id) {
       const now = new Date().toISOString()
 
       // Close old alliance membership
@@ -220,17 +220,20 @@ export async function PATCH(req: Request) {
           .is('left_at', null)
       }
 
-      // Open new alliance membership
-      const { data: newAlliance } = await supabase
-        .from('alliances').select('tag').eq('id', updates.alliance_id).single()
+      // Open new alliance membership (only if actually moving INTO an alliance,
+      // not being unassigned entirely)
+      if (updates.alliance_id) {
+        const { data: newAlliance } = await supabase
+          .from('alliances').select('tag').eq('id', updates.alliance_id).single()
 
-      await supabase.from('alliance_history').insert({
-        commander_uid: uid,
-        alliance_id:   updates.alliance_id,
-        alliance_tag:  newAlliance?.tag ?? '',
-        role:          updates.role ?? current.role,
-        joined_at:     now,
-      })
+        await supabase.from('alliance_history').insert({
+          commander_uid: uid,
+          alliance_id:   updates.alliance_id,
+          alliance_tag:  newAlliance?.tag ?? '',
+          role:          updates.role ?? current.role,
+          joined_at:     now,
+        })
+      }
     }
 
     const { error } = await supabase
@@ -240,13 +243,49 @@ export async function PATCH(req: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    // ── Real-time claim sync ────────────────────────────────────────────
+    // Firebase custom claims (which middleware turns into x-commander-role /
+    // x-alliance-id headers) are normally only set at login. If Supreme
+    // changes a commander's role or alliance here, that commander's existing
+    // session would otherwise keep showing the OLD role/alliance until they
+    // log out and back in. Sync claims immediately so the change is visible
+    // the moment their client picks it up (see RoleSyncProvider, which
+    // listens for this row changing and force-refreshes their session).
+    if (current.linked_google_uid && (updates.role !== undefined || updates.alliance_id !== undefined)) {
+      try {
+        const { adminAuth } = await import('@/lib/firebase/admin')
+        const newAllianceId = updates.alliance_id !== undefined ? updates.alliance_id : current.alliance_id
+
+        let allianceTag: string | null = null
+        if (newAllianceId) {
+          const { data: allianceRow } = await supabase
+            .from('alliances').select('tag').eq('id', newAllianceId).single()
+          allianceTag = allianceRow?.tag ?? null
+        }
+
+        await adminAuth.setCustomUserClaims(current.linked_google_uid, {
+          commander_uid:  uid,
+          commander_name: current.name,
+          role:           updates.role ?? current.role,
+          alliance_id:    newAllianceId,
+          alliance_tag:   allianceTag,
+        })
+      } catch (claimErr) {
+        // Non-fatal — the DB is already correct. Worst case, the commander
+        // sees the update on their next natural login instead of instantly.
+        console.error('[ADMIN COMMANDERS PATCH] claim sync failed:', claimErr)
+      }
+    }
+
     const auditAction = updates.status === 'disabled'
       ? 'commander_disabled'
       : updates.status === 'active'
         ? 'commander_enabled'
-        : updates.role
-          ? 'role_changed'
-          : 'commander_updated'
+        : updates.alliance_id !== undefined
+          ? 'commander_transferred'
+          : updates.role
+            ? 'role_changed'
+            : 'commander_updated'
 
     await writeAuditLog({
       action:               auditAction as any,
@@ -254,6 +293,7 @@ export async function PATCH(req: Request) {
       performed_by_role:    auth.role as any,
       performed_by_display: auth.commander_name,
       target_commander_uid: uid,
+      target_alliance_id:   updates.alliance_id !== undefined ? updates.alliance_id : current.alliance_id,
       metadata:             { ...updates, previous_role: current.role, previous_alliance: current.alliance_id },
     })
 

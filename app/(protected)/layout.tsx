@@ -1,8 +1,9 @@
 // app/(protected)/layout.tsx
 import { headers }   from 'next/headers'
 import { redirect }  from 'next/navigation'
-import Sidebar        from '@/components/layout/Sidebar'
-import BottomNav      from '@/components/layout/BottomNav'
+import Sidebar          from '@/components/layout/Sidebar'
+import BottomNav        from '@/components/layout/BottomNav'
+import RoleSyncProvider from '@/components/providers/RoleSyncProvider'
 import type { Role }  from '@/lib/types'
 
 export default async function ProtectedLayout({
@@ -36,7 +37,13 @@ export default async function ProtectedLayout({
       {/* lg:pl-64 = sidebar width on desktop | pb-20 = room for bottom nav on mobile */}
       <main className="lg:pl-64 min-h-screen">
         <div className="p-4 lg:p-6 pb-24 lg:pb-6">
-          {children}
+          <RoleSyncProvider
+            commanderUid={commanderUid}
+            currentRole={role}
+            currentAllianceId={allianceId}
+          >
+            {children}
+          </RoleSyncProvider>
         </div>
       </main>
 

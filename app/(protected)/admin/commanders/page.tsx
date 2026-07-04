@@ -1,7 +1,6 @@
-// app/admin/commanders/page.tsx
+// app/(protected)/admin/commanders/page.tsx
 'use client'
 import { useState, useEffect } from 'react'
-import { createAdminClient }   from '@/lib/supabase/admin'
 
 // ── Types ─────────────────────────────────────
 interface Commander {
@@ -24,10 +23,15 @@ export default function AdminCommandersPage() {
   const [msg,        setMsg]        = useState('')
   const [search,     setSearch]     = useState('')
 
-  // Form state
+  // Form state (add new commander)
   const [form, setForm] = useState({
     uid: '', name: '', role: 'r1', alliance_id: '', status: 'unassigned',
   })
+
+  // Move / transfer state (edit existing commander's role + alliance)
+  const [movingUid,  setMovingUid]  = useState<string | null>(null)
+  const [moveForm,   setMoveForm]   = useState({ role: 'r1', alliance_id: '' })
+  const [moving,     setMoving]     = useState(false)
 
   useEffect(() => { fetchData() }, [])
 
@@ -94,6 +98,43 @@ export default function AdminCommandersPage() {
     fetchData()
   }
 
+  const startMove = (c: Commander) => {
+    setMovingUid(c.uid)
+    setMoveForm({ role: c.role, alliance_id: c.alliance_id ?? '' })
+    setMsg('')
+  }
+
+  const cancelMove = () => {
+    setMovingUid(null)
+  }
+
+  const handleMove = async (uid: string, name: string) => {
+    setMoving(true); setMsg('')
+    try {
+      const res  = await fetch('/api/admin/commanders', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          uid,
+          role:        moveForm.role,
+          alliance_id: moveForm.alliance_id || null,
+          status:      moveForm.alliance_id ? 'active' : 'unassigned',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setMsg(data.error); return }
+      const destTag = alliances.find(a => a.id === moveForm.alliance_id)?.tag
+      setMsg(
+        moveForm.alliance_id
+          ? `${name} moved to [${destTag}] as ${moveForm.role.toUpperCase()}`
+          : `${name} unassigned from their alliance`
+      )
+      setMovingUid(null)
+      fetchData()
+    } catch { setMsg('Failed to move commander') }
+    finally  { setMoving(false) }
+  }
+
   const filtered = commanders.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.uid.toLowerCase().includes(search.toLowerCase())
@@ -123,9 +164,9 @@ export default function AdminCommandersPage() {
       {/* Feedback */}
       {msg && (
         <div className={`p-3 rounded-xl text-sm border animate-fade-in ${
-          msg.includes('success')
-            ? 'bg-accent-light border-accent/30 text-accent-deep'
-            : 'bg-red-50 border-red-200 text-red-700'
+          msg.toLowerCase().includes('fail') || msg.toLowerCase().includes('already') || msg.toLowerCase().includes('required')
+            ? 'bg-red-50 border-red-200 text-red-700'
+            : 'bg-accent-light border-accent/30 text-accent-deep'
         }`}>
           {msg}
         </div>
@@ -226,41 +267,96 @@ export default function AdminCommandersPage() {
               </thead>
               <tbody>
                 {filtered.map(c => (
-                  <tr key={c.uid}>
-                    <td className="font-medium text-tactical-900">{c.name}</td>
-                    <td className="font-mono text-xs text-tactical-500">{c.uid}</td>
-                    <td><span className="badge badge-active uppercase text-xs">{c.role}</span></td>
-                    <td className="font-mono text-sm">{getAllianceTag(c.alliance_id)}</td>
-                    <td>
-                      <span className={`badge ${STATUS_BADGE[c.status] ?? 'badge-inactive'}`}>
-                        {c.status}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge ${c.verification_status === 'linked' ? 'badge-active' : 'badge-pending'}`}>
-                        {c.verification_status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleDisable(c.uid, c.status !== 'disabled')}
-                          className={c.status === 'disabled' ? 'btn-ghost text-xs py-1 px-2' : 'btn-danger text-xs py-1 px-2'}
-                        >
-                          {c.status === 'disabled' ? 'Enable' : 'Disable'}
-                        </button>
-                        {c.linked_google_uid && (
+                  <>
+                    <tr key={c.uid}>
+                      <td className="font-medium text-tactical-900">{c.name}</td>
+                      <td className="font-mono text-xs text-tactical-500">{c.uid}</td>
+                      <td><span className="badge badge-active uppercase text-xs">{c.role}</span></td>
+                      <td className="font-mono text-sm">{getAllianceTag(c.alliance_id)}</td>
+                      <td>
+                        <span className={`badge ${STATUS_BADGE[c.status] ?? 'badge-inactive'}`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${c.verification_status === 'linked' ? 'badge-active' : 'badge-pending'}`}>
+                          {c.verification_status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => handleUnlink(c.uid, c.name)}
+                            onClick={() => movingUid === c.uid ? cancelMove() : startMove(c)}
                             className="btn-secondary text-xs py-1 px-2"
-                            title="Remove this commander's Google account link"
                           >
-                            Unlink
+                            {movingUid === c.uid ? 'Cancel' : 'Move'}
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          <button
+                            onClick={() => handleDisable(c.uid, c.status !== 'disabled')}
+                            className={c.status === 'disabled' ? 'btn-ghost text-xs py-1 px-2' : 'btn-danger text-xs py-1 px-2'}
+                          >
+                            {c.status === 'disabled' ? 'Enable' : 'Disable'}
+                          </button>
+                          {c.linked_google_uid && (
+                            <button
+                              onClick={() => handleUnlink(c.uid, c.name)}
+                              className="btn-secondary text-xs py-1 px-2"
+                              title="Remove this commander's Google account link"
+                            >
+                              Unlink
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Inline move/transfer row */}
+                    {movingUid === c.uid && (
+                      <tr key={`${c.uid}-move`}>
+                        <td colSpan={7} className="bg-surface-overlay">
+                          <div className="flex flex-wrap items-end gap-3 p-3">
+                            <div>
+                              <label className="text-xs font-medium text-tactical-600 block mb-1">New Role</label>
+                              <select
+                                className="input-base"
+                                value={moveForm.role}
+                                onChange={e => setMoveForm(f => ({ ...f, role: e.target.value }))}
+                              >
+                                {ROLES.map(r => (
+                                  <option key={r} value={r}>{r.toUpperCase()}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-tactical-600 block mb-1">New Alliance</label>
+                              <select
+                                className="input-base"
+                                value={moveForm.alliance_id}
+                                onChange={e => setMoveForm(f => ({ ...f, alliance_id: e.target.value }))}
+                              >
+                                <option value="">— Unassign (no alliance) —</option>
+                                {alliances.map(a => (
+                                  <option key={a.id} value={a.id}>[{a.tag}] {a.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              onClick={() => handleMove(c.uid, c.name)}
+                              disabled={moving}
+                              className="btn-primary text-sm"
+                            >
+                              {moving ? 'Moving...' : 'Confirm Transfer'}
+                            </button>
+                            <p className="text-xs text-tactical-400 basis-full">
+                              This bypasses the normal transfer request/approval flow — Supreme moves are immediate.
+                              If this commander is linked to a Google account, their role/alliance updates live
+                              on their screen without needing to log out.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
