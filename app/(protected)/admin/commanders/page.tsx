@@ -35,6 +35,15 @@ export default function AdminCommandersPage() {
 
   useEffect(() => { fetchData() }, [])
 
+  // Keep alliance/commander lists fresh if the tab was created or edited
+  // elsewhere (e.g. Supreme creating an alliance in another tab) while this
+  // page sat open in the background.
+  useEffect(() => {
+    const onFocus = () => fetchData()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
   const fetchData = async () => {
     setLoading(true)
     const res = await fetch('/api/admin/commanders')
@@ -98,7 +107,8 @@ export default function AdminCommandersPage() {
     fetchData()
   }
 
-  const startMove = (c: Commander) => {
+  const startMove = async (c: Commander) => {
+    await fetchData() // pull fresh alliances in case one was just created elsewhere
     setMovingUid(c.uid)
     setMoveForm({ role: c.role, alliance_id: c.alliance_id ?? '' })
     setMsg('')
@@ -156,7 +166,13 @@ export default function AdminCommandersPage() {
           <h1 className="page-title">Commanders</h1>
           <p className="page-subtitle">{commanders.length} total commanders</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary">
+        <button
+          onClick={() => {
+            if (!showForm) fetchData() // pull fresh alliances in case one was just created elsewhere
+            setShowForm(!showForm)
+          }}
+          className="btn-primary"
+        >
           {showForm ? 'Cancel' : '+ Add Commander'}
         </button>
       </div>
