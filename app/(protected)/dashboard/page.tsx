@@ -4,6 +4,8 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import UTCClock from '@/components/layout/UTCClock'
 import CanyonWeekToggle from '@/components/dashboard/CanyonWeekToggle'
+import AllianceOverviewCard from '@/components/dashboard/AllianceOverviewCard'
+import AllianceTargetsCard from '@/components/dashboard/AllianceTargetsCard'
 import { getWeekKey } from '@/lib/utils/utc2'
 import type { Role } from '@/lib/types'
 
@@ -119,13 +121,13 @@ export default async function DashboardPage() {
     alliance_created: 'Alliance created',
   }
 
-  const targets = [
-    { done: alliance?.target_1_completed, text: alliance?.target_1 },
-    { done: alliance?.target_2_completed, text: alliance?.target_2 },
-    { done: alliance?.target_3_completed, text: alliance?.target_3 },
-    { done: alliance?.target_4_completed, text: alliance?.target_4 },
-    { done: alliance?.target_5_completed, text: alliance?.target_5 },
-  ].filter((t) => t.text)
+  const targetSlots = [
+    { text: alliance?.target_1 ?? '', completed: !!alliance?.target_1_completed },
+    { text: alliance?.target_2 ?? '', completed: !!alliance?.target_2_completed },
+    { text: alliance?.target_3 ?? '', completed: !!alliance?.target_3_completed },
+    { text: alliance?.target_4 ?? '', completed: !!alliance?.target_4_completed },
+    { text: alliance?.target_5 ?? '', completed: !!alliance?.target_5_completed },
+  ]
 
   return (
     <div className="flex flex-col gap-5 animate-fade-in">
@@ -224,88 +226,18 @@ export default async function DashboardPage() {
       {allianceId && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Alliance Overview */}
-          <div className="glass-card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-xs text-tactical-500">Alliance Overview</p>
-                <p className="font-semibold text-tactical-900">Command Center</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {canEditAlliance && (
-                  <a
-                    href="/alliance/settings"
-                    className="text-xs px-2.5 py-1 rounded-lg border border-tactical-200 text-tactical-500 hover:border-accent hover:text-accent transition-colors"
-                  >
-                    ✏ Edit
-                  </a>
-                )}
-                <span className="text-3xl">🏰</span>
-              </div>
-            </div>
+          <AllianceOverviewCard
+            allianceId={allianceId}
+            activeCount={activeCount}
+            initialGiftLevel={alliance?.gift_level ?? null}
+            canEdit={canEditAlliance}
+          />
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">Members</p>
-                <p className="text-xl font-semibold text-tactical-900">
-                  {activeCount}/100
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">Gift Level</p>
-                <p className="text-xl font-semibold text-tactical-900">
-                  {alliance?.gift_level ?? '-'}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">Alliance Rank</p>
-                <p className="text-xl font-semibold text-green-700">#1</p>
-              </div>
-
-              <div className="rounded-xl bg-surface-overlay p-3 text-center">
-                <p className="text-xs text-tactical-500">Status</p>
-                <p className="text-xl font-semibold text-green-700">Active</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Weekly Objectives */}
-          <div className="glass-card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-xs text-tactical-500">Weekly Objectives</p>
-                <p className="font-semibold text-tactical-900">Alliance Targets</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {canEditAlliance && (
-                  <a
-                    href="/alliance/settings"
-                    className="text-xs px-2.5 py-1 rounded-lg border border-tactical-200 text-tactical-500 hover:border-accent hover:text-accent transition-colors"
-                  >
-                    ✏ Edit
-                  </a>
-                )}
-                <span className="text-3xl">🎯</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              {targets.length > 0 ? (
-                targets.map((obj, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className={obj.done ? 'text-green-500' : 'text-amber-500'}>
-                      {obj.done ? '✓' : '○'}
-                    </span>
-                    <span className="text-sm text-tactical-800">{obj.text}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-tactical-400">No targets set</p>
-              )}
-            </div>
-          </div>
+          <AllianceTargetsCard
+            allianceId={allianceId}
+            initialTargets={targetSlots}
+            canEdit={canEditAlliance}
+          />
 
         </div>
       )}
