@@ -127,6 +127,7 @@ export default async function MembersPage({
                       </div>
                       <div>
                         <p className="font-medium text-tactical-900 text-sm">{m.name}</p>
+                        <p className="text-xs font-mono text-tactical-400">{m.uid}</p>
                       </div>
                     </div>
                   </td>
