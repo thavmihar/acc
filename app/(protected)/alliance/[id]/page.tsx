@@ -68,25 +68,15 @@ export default async function AlliancePage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div className="stat-card">
           <span className="text-xs text-tactical-500">Active Members</span>
           <p className="text-2xl font-semibold text-tactical-900 mt-1">{activeCount}</p>
-        </div>
-        <div className="stat-card">
-          <span className="text-xs text-tactical-500">Total Members</span>
-          <p className="text-2xl font-semibold text-tactical-900 mt-1">{(members ?? []).length}</p>
         </div>
         <div className={`stat-card ${inactiveCount > 0 ? 'border border-amber-300 bg-amber-50/40' : ''}`}>
           <span className="text-xs text-tactical-500">Inactive Flags</span>
           <p className={`text-2xl font-semibold mt-1 ${inactiveCount > 0 ? 'text-amber-700' : 'text-tactical-900'}`}>
             {inactiveCount}
-          </p>
-        </div>
-        <div className="stat-card">
-          <span className="text-xs text-tactical-500">DSB State</span>
-          <p className="text-sm font-semibold text-tactical-900 mt-1 capitalize">
-            {dsbEvent?.state ? STATE_LABEL[dsbEvent.state] : '—'}
           </p>
         </div>
       </div>
