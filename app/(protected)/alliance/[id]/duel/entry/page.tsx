@@ -61,7 +61,7 @@ export default function DuelEntryPage() {
   const [msg,            setMsg]            = useState('')
   const [activeDay,      setActiveDay]      = useState<DuelDay>('monday')
   const [showModeSelect, setShowModeSelect] = useState(false)
-  const [selectedMode,   setSelectedMode]   = useState<'quick'|'full'>('quick')
+  const [selectedMode,   setSelectedMode]   = useState<'quick'|'full'|null>(null)
   const [minScore,       setMinScore]       = useState('')
 
   // Detailed Mode local state
@@ -143,6 +143,7 @@ export default function DuelEntryPage() {
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleStartWeek = async () => {
+    if (!selectedMode) { setMsg('Choose Simple Mode or Detailed Mode before starting the week'); return }
     setSaving(true); setMsg('')
     try {
       const res  = await fetch('/api/duel/week', {
@@ -250,8 +251,8 @@ export default function DuelEntryPage() {
     return (
       <div className="flex flex-col gap-5 animate-fade-in max-w-lg">
         <div className="page-header">
-          <h1 className="page-title">Start Duel Week</h1>
-          <p className="page-subtitle">Choose entry mode for this week</p>
+          <h1 className="page-title">Which mode for this week?</h1>
+          <p className="page-subtitle">Pick Simple or Detailed — this applies to every day for the whole week</p>
         </div>
 
         {msg && (
@@ -297,8 +298,18 @@ export default function DuelEntryPage() {
           ))}
         </div>
 
-        <button onClick={handleStartWeek} disabled={saving} className="btn-primary w-full">
-          {saving ? 'Starting…' : 'Start This Week →'}
+        {!selectedMode && (
+          <p className="text-xs text-amber-600 text-center -mt-2">
+            ⚠ Select Simple Mode or Detailed Mode to continue
+          </p>
+        )}
+
+        <button
+          onClick={handleStartWeek}
+          disabled={saving || !selectedMode}
+          className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Starting…' : selectedMode ? 'Start This Week →' : 'Select a mode first'}
         </button>
       </div>
     )
