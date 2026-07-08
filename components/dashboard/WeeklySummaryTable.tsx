@@ -2,11 +2,38 @@
 'use client'
 
 interface WeekSummary {
-  week_key:            string
-  duel_passed:         number
-  duel_absent:         number
-  duel_below:          number
-  dsb_attendance_rate: number | null
+  week_key:               string
+  duel_passed:            number
+  duel_absent:            number
+  duel_below:             number
+  dsb_attendance_rate:    number | null
+  canyon_attendance_rate: number | null
+  duel_attendance_rate:   number | null
+}
+
+/** Small reusable rate bar — used for DSB / Canyon / Duel attendance columns */
+function RateCell({ rate }: { rate: number | null }) {
+  if (rate === null) {
+    return <span style={{ color: '#CBD5E1', fontSize: 12 }}>—</span>
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{
+        flex: 1, height: 6, background: '#F1F5F9',
+        borderRadius: 3, overflow: 'hidden', minWidth: 50,
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${rate}%`,
+          background: rate >= 70 ? '#22C55E' : rate >= 40 ? '#F59E0B' : '#EF4444',
+          borderRadius: 3,
+        }} />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
+        {rate}%
+      </span>
+    </div>
+  )
 }
 
 export default function WeeklySummaryTable({ data }: { data: WeekSummary[] }) {
@@ -16,7 +43,7 @@ export default function WeeklySummaryTable({ data }: { data: WeekSummary[] }) {
         Weekly Summary
       </p>
       <p style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
-        Duel and DSB performance per week
+        Duel, DSB, and Canyon performance per week
       </p>
 
       {data.length === 0 ? (
@@ -28,7 +55,7 @@ export default function WeeklySummaryTable({ data }: { data: WeekSummary[] }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
-                {['Week','Duel Passed','Below Min','Absent','DSB Rate'].map(h => (
+                {['Week','Duel Passed','Below Min','Absent','Duel Rate','DSB Rate','Canyon Rate'].map(h => (
                   <th key={h} style={{
                     padding: '10px 12px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: '#64748B',
@@ -73,27 +100,13 @@ export default function WeeklySummaryTable({ data }: { data: WeekSummary[] }) {
                     </span>
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    {row.dsb_attendance_rate !== null ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{
-                          flex: 1, height: 6, background: '#F1F5F9',
-                          borderRadius: 3, overflow: 'hidden', minWidth: 60,
-                        }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${row.dsb_attendance_rate}%`,
-                            background: row.dsb_attendance_rate >= 70 ? '#22C55E' :
-                                        row.dsb_attendance_rate >= 40 ? '#F59E0B' : '#EF4444',
-                            borderRadius: 3,
-                          }} />
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
-                          {row.dsb_attendance_rate}%
-                        </span>
-                      </div>
-                    ) : (
-                      <span style={{ color: '#CBD5E1', fontSize: 12 }}>—</span>
-                    )}
+                    <RateCell rate={row.duel_attendance_rate} />
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <RateCell rate={row.dsb_attendance_rate} />
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <RateCell rate={row.canyon_attendance_rate} />
                   </td>
                 </tr>
               ))}

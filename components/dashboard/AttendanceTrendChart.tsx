@@ -15,22 +15,25 @@ interface TrendPoint {
 interface Props {
   dsbData:    TrendPoint[]
   canyonData: TrendPoint[]
+  duelData:   TrendPoint[]
 }
 
-export default function AttendanceTrendChart({ dsbData, canyonData }: Props) {
-  // Merge DSB and Canyon data by week
+export default function AttendanceTrendChart({ dsbData, canyonData, duelData }: Props) {
+  // Merge DSB, Canyon, and Duel data by week
   const allWeeks = Array.from(new Set([
     ...dsbData.map(d => d.week),
     ...canyonData.map(d => d.week),
+    ...duelData.map(d => d.week),
   ])).sort()
 
   const merged = allWeeks.map(week => ({
     week,
     dsb_rate:    dsbData.find(d => d.week === week)?.rate ?? null,
     canyon_rate: canyonData.find(d => d.week === week)?.rate ?? null,
+    duel_rate:   duelData.find(d => d.week === week)?.rate ?? null,
   }))
 
-  const hasData = dsbData.length > 0 || canyonData.length > 0
+  const hasData = dsbData.length > 0 || canyonData.length > 0 || duelData.length > 0
 
   return (
     <div className="glass-card p-5">
@@ -39,7 +42,7 @@ export default function AttendanceTrendChart({ dsbData, canyonData }: Props) {
           Attendance Trend
         </p>
         <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
-          DSB and Canyon attendance rates over recent weeks
+          DSB, Canyon, and Duel attendance rates over recent weeks
         </p>
       </div>
 
@@ -93,6 +96,16 @@ export default function AttendanceTrendChart({ dsbData, canyonData }: Props) {
               stroke="#6366F1"
               strokeWidth={2.5}
               dot={{ fill: '#6366F1', r: 4 }}
+              activeDot={{ r: 6 }}
+              connectNulls
+            />
+            <Line
+              type="monotone"
+              dataKey="duel_rate"
+              name="Duel Attendance"
+              stroke="#F59E0B"
+              strokeWidth={2.5}
+              dot={{ fill: '#F59E0B', r: 4 }}
               activeDot={{ r: 6 }}
               connectNulls
             />

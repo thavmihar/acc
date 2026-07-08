@@ -115,7 +115,7 @@ export default async function AnalyticsPage({
     return { week: event.week_key.replace('20',''), attended, total, rate }
   }).reverse()
 
-  // ── Build Duel performance data ───────────────
+  // ── Build Duel performance data (pass/below/absent breakdown) ──
   const duelTrend = weekList.map(week => {
     const weekEntries = entryList.filter(e => e.duel_week_id === week.id)
     const total   = weekEntries.length
@@ -127,6 +127,19 @@ export default async function AnalyticsPage({
       week: week.week_key.replace('20',''),
       passed, absent, below, total, rate,
     }
+  }).reverse()
+
+  // ── Build Duel ATTENDANCE trend — same "attended" framing as DSB/Canyon.
+  // Here "attended" means the commander actually played that week (status
+  // is passed or below_minimum), regardless of whether they hit minimum —
+  // absent is the only thing that counts as a non-attendance, matching how
+  // DSB/Canyon attendance is defined.
+  const duelAttendanceTrend = weekList.map(week => {
+    const weekEntries = entryList.filter(e => e.duel_week_id === week.id)
+    const total    = weekEntries.length
+    const attended = weekEntries.filter(e => e.status === 'passed' || e.status === 'below_minimum').length
+    const rate     = total > 0 ? Math.round((attended / total) * 100) : 0
+    return { week: week.week_key.replace('20',''), attended, total, rate }
   }).reverse()
 
   // ── Top contributors (full mode only) ────────
@@ -151,17 +164,31 @@ export default async function AnalyticsPage({
     const passed = weekEntries.filter(e => e.status === 'passed').length
     const absent = weekEntries.filter(e => e.status === 'absent').length
     const below  = weekEntries.filter(e => e.status === 'below_minimum').length
+
     const dsbEv  = dsbList.find(d => d.week_key === week.week_key)
-    const dsbAttRate = dsbEv
+    const dsbAttendanceRate = dsbEv
       ? Math.round((dsbAtt.filter(a => a.event_id === dsbEv.id && a.status === 'attended').length /
           Math.max(dsbAtt.filter(a => a.event_id === dsbEv.id).length, 1)) * 100)
       : null
+
+    const canyonEv = canyonList.find(c => c.week_key === week.week_key)
+    const canyonAttendanceRate = canyonEv
+      ? Math.round((canyonAtt.filter(a => a.event_id === canyonEv.id && a.status === 'attended').length /
+          Math.max(canyonAtt.filter(a => a.event_id === canyonEv.id).length, 1)) * 100)
+      : null
+
+    const duelTotal    = weekEntries.length
+    const duelAttended = weekEntries.filter(e => e.status === 'passed' || e.status === 'below_minimum').length
+    const duelAttendanceRate = duelTotal > 0 ? Math.round((duelAttended / duelTotal) * 100) : null
+
     return {
       week_key: week.week_key,
       duel_passed: passed,
       duel_absent: absent,
       duel_below: below,
-      dsb_attendance_rate: dsbAttRate,
+      dsb_attendance_rate:    dsbAttendanceRate,
+      canyon_attendance_rate: canyonAttendanceRate,
+      duel_attendance_rate:   duelAttendanceRate,
     }
   })
 
@@ -205,10 +232,11 @@ export default async function AnalyticsPage({
         </div>
       </div>
 
-      {/* DSB Attendance Trend */}
+      {/* DSB / Canyon / Duel Attendance Trend */}
       <AttendanceTrendChart
         dsbData={dsbTrend}
         canyonData={canyonTrend}
+        duelData={duelAttendanceTrend}
       />
 
       {/* Duel Performance */}
