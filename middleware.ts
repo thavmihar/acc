@@ -10,10 +10,13 @@ const PUBLIC_ROUTES   = ['/', '/login', '/register']
 const PUBLIC_PREFIXES = ['/verify', '/api/auth', '/_next', '/favicon', '/api/verify']
 
 // Routes only supreme can access
-const SUPREME_ONLY = ['/admin', '/audit']
+const SUPREME_ONLY = ['/admin']
 
-// Routes only r4+ can access (within an alliance)
-const R4_PLUS_PATHS = ['/verification', '/settings', '/attendance', '/transfers']
+// Routes only r4+ can access (within an alliance).
+// /audit is included here — the page itself scopes non-Supreme roles to
+// their own alliance's log, Supreme sees everything, so it only needs to
+// be gated at R4+ rather than Supreme-only.
+const R4_PLUS_PATHS = ['/verification', '/settings', '/attendance', '/transfers', '/audit']
 
 // Only the permanent identity comes from the session cookie now. role,
 // alliance_id, alliance_tag, and name used to also live here as a frozen
