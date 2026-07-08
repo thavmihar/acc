@@ -2,9 +2,10 @@
 // components/layout/BottomNav.tsx
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { Role } from '@/lib/types'
+import { signOutUser } from '@/lib/firebase/client'
 
 interface Props {
   role:       Role
@@ -13,10 +14,19 @@ interface Props {
 
 export default function BottomNav({ role, allianceId }: Props) {
   const pathname = usePathname()
+  const router    = useRouter()
   const [menuOpen,    setMenuOpen]    = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [signingOut,  setSigningOut]  = useState(false)
 
   const allianceBase = allianceId ? `/alliance/${allianceId}` : '#'
+
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    setProfileOpen(false)
+    await signOutUser()
+    router.push('/login')
+  }
 
   // ── Popup menu items (role-gated) ─────────────────────────────────────────
   const menuItems: { label: string; href: string; icon: string }[] = [
@@ -124,12 +134,13 @@ export default function BottomNav({ role, allianceId }: Props) {
               <span>Settings</span>
             </Link>
             <button
-              onClick={() => { window.location.href = '/logout' }}
+              onClick={handleSignOut}
+              disabled={signingOut}
               className="flex w-full items-center gap-3 rounded-2xl px-4 py-3
-                         text-red-600 hover:bg-red-50 transition"
+                         text-red-600 hover:bg-red-50 transition disabled:opacity-50"
             >
               <span className="text-xl">🚪</span>
-              <span>Logout</span>
+              <span>{signingOut ? 'Signing out…' : 'Logout'}</span>
             </button>
           </div>
         </div>
