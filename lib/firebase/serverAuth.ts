@@ -32,7 +32,18 @@ async function fetchLiveCommander(commanderUid: string) {
     .eq('uid', commanderUid)
     .single()
 
-  if (error || !commander || commander.status === 'disabled') return null
+  if (error) {
+    console.error('[fetchLiveCommander] Supabase query failed', { commanderUid, error: error.message })
+    return null
+  }
+  if (!commander) {
+    console.error('[fetchLiveCommander] no commander row for uid', { commanderUid })
+    return null
+  }
+  if (commander.status === 'disabled') {
+    console.error('[fetchLiveCommander] commander is disabled', { commanderUid })
+    return null
+  }
 
   let allianceTag: string | null = null
   if (commander.alliance_id) {
@@ -67,14 +78,34 @@ async function fetchLiveCommander(commanderUid: string) {
 export async function requireAuth(): Promise<AuthContext | null> {
   const cookieStore   = await cookies()
   const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value
-  if (!sessionCookie) return null
+  if (!sessionCookie) {
+    console.error('[requireAuth] no session cookie present on request')
+    return null
+  }
 
   const decoded = await verifySessionCookie(sessionCookie, true)
-  if (!decoded) return null
-  if (!decoded.commander_uid) return null
+  if (!decoded) {
+    console.error('[requireAuth] verifySessionCookie failed — cookie present but invalid/expired')
+    return null
+  }
+  if (!decoded.commander_uid) {
+    console.error('[requireAuth] decoded cookie has no commander_uid claim', { uid: decoded.uid })
+    return null
+  }
 
   const live = await fetchLiveCommander(decoded.commander_uid)
-  if (!live || !live.role) return null
+  if (!live) {
+    console.error('[requireAuth] fetchLiveCommander returned null — no matching/active commander row', {
+      commanderUid: decoded.commander_uid,
+    })
+    return null
+  }
+  if (!live.role) {
+    console.error('[requireAuth] commander row found but role is null/empty', {
+      commanderUid: decoded.commander_uid,
+    })
+    return null
+  }
 
   return {
     ...decoded,
