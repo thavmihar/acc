@@ -1,15 +1,20 @@
 // lib/duel-import/extract.ts
-// SERVER-ONLY. Calls Claude's vision API to read rank/name/score triplets
-// off a Last War Dual leaderboard screenshot.
+// SERVER-ONLY. Calls Google's Gemini vision API to read rank/name/score
+// triplets off a Last War Dual leaderboard screenshot.
 //
-// Requires ANTHROPIC_API_KEY in the environment. Add it to .env.local and
-// to your Vercel project's environment variables — this module throws a
-// clear error if it's missing rather than failing silently.
+// Requires GEMINI_API_KEY in the environment. Add it to .env.local and to
+// your Vercel project's environment variables — this module throws a
+// clear error if it's missing rather than failing silently. Get a free-tier
+// key at https://aistudio.google.com/apikey.
 
+import { GoogleGenAI } from '@google/genai'
 import type { RawExtractedRow } from './types'
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-5'
+// gemini-2.5-flash: Google's current recommended price-performance
+// multimodal model, well suited to high-volume image extraction like this,
+// and available on Gemini's free tier. Not a -preview model, so it won't
+// get shut down on short notice like preview model IDs sometimes do.
+const MODEL = 'gemini-2.5-flash'
 
 const EXTRACTION_SYSTEM_PROMPT = `You read Last War: Survival "Dual" leaderboard screenshots and extract every row as structured data.
 
@@ -34,63 +39,65 @@ interface ExtractImageInput {
 
 export class ExtractionError extends Error {}
 
+let cachedClient: GoogleGenAI | null = null
+function getClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    throw new ExtractionError(
+      'GEMINI_API_KEY is not configured. Add it to your environment to enable Bulk Import.',
+    )
+  }
+  if (!cachedClient) {
+    cachedClient = new GoogleGenAI({ apiKey })
+  }
+  return cachedClient
+}
+
 export async function extractRowsFromImage(
   image: ExtractImageInput,
 ): Promise<RawExtractedRow[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new ExtractionError(
-      'ANTHROPIC_API_KEY is not configured. Add it to your environment to enable Bulk Import.',
-    )
-  }
+  const ai = getClient()
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type':      'application/json',
-      'x-api-key':         apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
+  let response
+  try {
+    response = await ai.models.generateContent({
       model: MODEL,
-      max_tokens: 4096,
-      system: EXTRACTION_SYSTEM_PROMPT,
-      messages: [
+      contents: [
         {
           role: 'user',
-          content: [
+          parts: [
             {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: image.mediaType,
+              inlineData: {
+                mimeType: image.mediaType,
                 data: image.base64Data,
               },
             },
             {
-              type: 'text',
               text: 'Extract every rank/name/score row from this Dual leaderboard screenshot as a JSON array.',
             },
           ],
         },
       ],
-    }),
-  })
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '')
-    throw new ExtractionError(`Vision API error (${response.status}): ${body.slice(0, 300)}`)
+      config: {
+        systemInstruction: EXTRACTION_SYSTEM_PROMPT,
+        responseMimeType: 'application/json',
+      },
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new ExtractionError(`Vision API error: ${message.slice(0, 300)}`)
   }
 
-  const data = await response.json()
-  const textBlock = (data.content ?? []).find((b: any) => b.type === 'text')
-  if (!textBlock) {
+  const text = response.text
+  if (!text) {
     throw new ExtractionError('No text response from vision API')
   }
 
   let parsed: any[]
   try {
-    const cleaned = textBlock.text.trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '')
+    // responseMimeType: 'application/json' should return clean JSON, but
+    // strip markdown fences defensively in case the model wraps it anyway.
+    const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '')
     parsed = JSON.parse(cleaned)
   } catch {
     throw new ExtractionError('Could not parse extraction result as JSON')
@@ -113,8 +120,8 @@ export async function extractRowsFromImage(
 }
 
 /**
- * Processes multiple images with limited concurrency (Claude's API has
- * per-minute rate limits; 3 in flight at a time keeps this well within
+ * Processes multiple images with limited concurrency (Gemini's free tier
+ * has per-minute rate limits; 3 in flight at a time keeps this well within
  * normal limits for a batch of up to 50 screenshots) and reports progress
  * as each one finishes via onProgress.
  */

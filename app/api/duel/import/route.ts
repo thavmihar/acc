@@ -12,7 +12,7 @@
 // Detailed Mode -> Alliance Result -> lock-day flow, so Victory/Defeat
 // stays a manual decision every time, same as every other entry path.
 //
-// Requires ANTHROPIC_API_KEY in the environment (see lib/duel-import/extract.ts).
+// Requires GEMINI_API_KEY in the environment (see lib/duel-import/extract.ts).
 
 import { requireAuth }       from '@/lib/firebase/serverAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -22,7 +22,9 @@ import { resolveDuplicatesAndRanks } from '@/lib/duel-import/dedupe'
 import { IMPORT_LIMITS, type ImportProgressEvent, type ImportSummary } from '@/lib/duel-import/types'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300 // Vercel Pro+ required for batches near 50 images; see README note
+export const maxDuration = 60 // Hobby plan max is 60s. Batches of 50 images at ~3-6s each with
+                               // concurrency 3 can exceed this — if you upgrade to Pro (300s cap),
+                               // raise this back up. Until then, encourage batches under ~20 images.
 
 interface ImportRequestImage {
   name: string
