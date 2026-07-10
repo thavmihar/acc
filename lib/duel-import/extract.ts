@@ -10,11 +10,13 @@
 import { GoogleGenAI } from '@google/genai'
 import type { RawExtractedRow } from './types'
 
-// gemini-2.5-flash: Google's current recommended price-performance
-// multimodal model, well suited to high-volume image extraction like this,
-// and available on Gemini's free tier. Not a -preview model, so it won't
-// get shut down on short notice like preview model IDs sometimes do.
-const MODEL = 'gemini-2.5-flash'
+// gemini-3.5-flash: Google's current GA multimodal model (no shutdown date
+// announced), and their own explicitly stated replacement for gemini-2.5-flash
+// once that model stopped accepting new API keys. Chosen over the -lite
+// variant because reading small, decorative-Unicode leaderboard text needs
+// the non-lite model's accuracy; batches here are capped at 50 images, so
+// -lite's cost savings aren't worth the accuracy trade-off at this volume.
+const MODEL = 'gemini-3.5-flash'
 
 const EXTRACTION_SYSTEM_PROMPT = `You read Last War: Survival "Dual" leaderboard screenshots and extract every row as structured data.
 
