@@ -25,7 +25,7 @@ const SendSchema = z.object({
     body:  z.string().max(300),
   }),
   data: z.object({
-    type:       z.enum(['inactive_flag', 'transfer_request', 'event_update', 'general']),
+    type:       z.enum(['inactive_flag', 'transfer_request', 'event_update', 'general', 'alliance_alert']),
     url:        z.string().optional(),
     allianceId: z.string().optional(),
     transferId: z.string().optional(),

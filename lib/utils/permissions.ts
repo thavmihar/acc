@@ -44,6 +44,7 @@ export const can = {
   viewMembers:       (r: Role) => hasRole(r, 'r1'),
   viewDashboard:     (r: Role) => hasRole(r, 'r1'),
   requestTransfer:   (r: Role) => hasRole(r, 'r1'),
+  sendAllianceAlert: (r: Role) => hasRole(r, 'r1'),
 
   // ── Role removal logic ────────────────────
   canRemove: (actor: Role, target: Role): boolean => {

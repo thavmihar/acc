@@ -9,7 +9,12 @@ const INTERNAL_SECRET = process.env.FCM_INTERNAL_SECRET!;
 
 // ─── Core sender ─────────────────────────────────────────────────────────────
 
-export async function sendNotification(payload: FCMSendPayload): Promise<void> {
+export interface SendNotificationResult {
+  sent: number
+  failed: number
+}
+
+export async function sendNotification(payload: FCMSendPayload): Promise<SendNotificationResult | null> {
   try {
     const res = await fetch(`${APP_URL}/api/fcm/send`, {
       method:  'POST',
@@ -19,10 +24,17 @@ export async function sendNotification(payload: FCMSendPayload): Promise<void> {
       },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) console.error('[FCM] sendNotification failed:', await res.json().catch(() => ({})));
+    if (!res.ok) {
+      console.error('[FCM] sendNotification failed:', await res.json().catch(() => ({})));
+      return null;
+    }
+    const data = await res.json().catch(() => null);
+    if (!data) return null;
+    return { sent: data.sent ?? 0, failed: data.failed ?? 0 };
   } catch (err) {
     // Non-fatal — never crash a server action over a notification
     console.error('[FCM] sendNotification error:', err);
+    return null;
   }
 }
 

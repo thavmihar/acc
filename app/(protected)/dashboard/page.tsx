@@ -6,6 +6,7 @@ import UTCClock from '@/components/layout/UTCClock'
 import CanyonWeekToggle from '@/components/dashboard/CanyonWeekToggle'
 import AllianceOverviewCard from '@/components/dashboard/AllianceOverviewCard'
 import AllianceTargetsCard from '@/components/dashboard/AllianceTargetsCard'
+import AllianceAlertWidget from '@/components/dashboard/AllianceAlertWidget'
 import { getWeekKey } from '@/lib/utils/utc2'
 import type { Role } from '@/lib/types'
 
@@ -247,6 +248,9 @@ export default async function DashboardPage() {
 
         </div>
       )}
+
+      {/* Alliance Alert */}
+      {allianceId && <AllianceAlertWidget allianceId={allianceId} />}
 
       {/* Recent Activity */}
       <div className="glass-card p-5">

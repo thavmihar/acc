@@ -238,6 +238,7 @@ export type AuditAction =
   | 'canyon_team_updated'
   | 'canyon_attendance_recorded'
   | 'inactive_flagged'
+  | 'alliance_alert_sent'
 
 export interface AuditLog {
   id: string
