@@ -3,7 +3,6 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import UTCClock from '@/components/layout/UTCClock'
-import CanyonWeekToggle from '@/components/dashboard/CanyonWeekToggle'
 import AllianceOverviewCard from '@/components/dashboard/AllianceOverviewCard'
 import AllianceTargetsCard from '@/components/dashboard/AllianceTargetsCard'
 import AllianceAlertWidget from '@/components/dashboard/AllianceAlertWidget'
@@ -32,7 +31,6 @@ export default async function DashboardPage() {
     { data: members },
     { data: inactiveMembers },
     { data: recentLogs },
-    { data: canyonStatus },
   ] = await Promise.all([
     supabase
       .from('commanders')
@@ -90,15 +88,7 @@ export default async function DashboardPage() {
           .order('created_at', { ascending: false })
           .limit(8)
       : Promise.resolve({ data: [] }),
-
-    supabase
-      .from('weekly_canyon_status')
-      .select('active')
-      .eq('week_key', weekKey)
-      .single(),
   ])
-
-  const canyonActive = canyonStatus?.active ?? true // no row yet this week = default ON
 
   const activeCount = (members ?? []).length
   const inactiveCount = (inactiveMembers ?? []).length
@@ -149,20 +139,12 @@ export default async function DashboardPage() {
           {weekKey} · {role?.toUpperCase()} ·{' '}
           {allianceId ? 'Alliance active' : 'No alliance assigned'}
         </p>
-
-        <div className="mt-2">
-          <CanyonWeekToggle
-            weekKey={weekKey}
-            initialActive={canyonActive}
-            isSupreme={role === 'supreme'}
-          />
-        </div>
       </div>
 
-      {/* Alliance Alert — replaces the old Active Members / Inactive Flags
-          stat row. activeCount/inactiveCount are still computed above and
-          still used by the flagged-commanders banner below and by
-          AllianceOverviewCard, so nothing else needed to change. */}
+      {/* Alliance Alert — replaces the old Canyon-toggle badge and the
+          Active Members / Inactive Flags stat row. activeCount/inactiveCount
+          are still computed above and still feed the flagged-commanders
+          banner below and AllianceOverviewCard's activeCount prop. */}
       {allianceId && <AllianceAlertWidget allianceId={allianceId} />}
 
       {/* Inactive alert */}
